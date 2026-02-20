@@ -657,6 +657,46 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflo
 .spectral-tooltip .st-pos{color:var(--writer)}
 .spectral-tooltip .st-neg{color:var(--eraser)}
 
+/* FEATURES PANEL */
+.features-section{margin-top:40px;opacity:0;animation:fadeUp .5s .18s ease forwards}
+.features-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px 28px;overflow:hidden}
+.features-narr{font-family:var(--font-serif);font-size:.82rem;line-height:1.65;color:var(--text-dim);margin-bottom:16px}
+.features-narr em{color:var(--accent);font-style:normal;font-weight:500}
+.features-tabs{display:flex;gap:2px;margin-bottom:18px;background:var(--bg);border-radius:6px;padding:2px;border:1px solid var(--border)}
+.features-tab{flex:1;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;
+  padding:7px 14px;border-radius:4px;cursor:pointer;color:var(--text-muted);background:transparent;
+  border:none;transition:all .15s;text-align:center;white-space:nowrap}
+.features-tab:hover{color:var(--text-dim);background:var(--bg-hover)}
+.features-tab.active{color:var(--accent);background:var(--accent-dim);box-shadow:0 0 12px rgba(56,189,248,.06)}
+.features-pane{display:none}
+.features-pane.active{display:block}
+.features-layers{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+@media(max-width:900px){.features-layers{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:560px){.features-layers{grid-template-columns:repeat(2,1fr)}}
+.features-layer-col{min-width:0}
+.features-layer-header{font-family:var(--font-mono);font-size:.54rem;color:var(--text-muted);letter-spacing:.06em;
+  text-transform:uppercase;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:baseline}
+.features-layer-header .fl-num{font-weight:600;font-size:.62rem}
+.features-layer-header .fl-title{font-size:.44rem;color:var(--text-dim)}
+.feat-card{padding:6px 8px;background:var(--bg);border-radius:4px;margin-bottom:4px;border:1px solid var(--border);
+  transition:border-color .15s;cursor:default;position:relative}
+.feat-card:hover{border-color:var(--border-hi)}
+.feat-card.persistent{border-left:2px solid var(--accent)}
+.feat-card.velocity-only{border-left:2px solid var(--mlp-color)}
+.feat-card.shared{border-left:2px solid var(--writer)}
+.feat-card-id{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted)}
+.feat-card-summary{font-family:var(--font-sans);font-size:.66rem;color:var(--text);line-height:1.3;margin:2px 0}
+.feat-card-meta{font-family:var(--font-mono);font-size:.46rem;color:var(--text-muted);display:flex;gap:6px;flex-wrap:wrap}
+.feat-card-badge{font-family:var(--font-mono);font-size:.42rem;padding:1px 4px;border-radius:2px}
+.feat-card-badge.act{background:rgba(56,189,248,.08);color:var(--accent)}
+.feat-card-badge.ans-pos{background:rgba(45,212,160,.08);color:var(--writer)}
+.feat-card-badge.ans-neg{background:rgba(248,113,113,.08);color:var(--eraser)}
+.feat-card-badge.vel{background:rgba(192,132,252,.08);color:var(--mlp-color)}
+.feat-card-badge.persist{background:rgba(56,189,248,.08);color:var(--accent)}
+.features-legend{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap;font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted)}
+.features-legend-item{display:flex;align-items:center;gap:5px}
+.features-legend-pip{width:10px;height:3px;border-radius:1px;flex-shrink:0}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .empty{text-align:center;padding:120px 0;font-family:var(--font-serif);font-size:1.05rem;color:var(--text-dim)}
 .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;
@@ -1301,7 +1341,14 @@ function renderAll(d){
     makeCollapsible(expSec);
     raf(()=>buildExplorerHeatmap(d));
 
-    // 5. SPECTRAL ANALYSIS
+    // 5. FEATURE REPRESENTATION
+    const featSec=ce('div','features-section');
+    featSec.innerHTML=renderFeaturesPanel(d);
+    main.appendChild(featSec);
+    makeCollapsible(featSec);
+    raf(()=>initFeaturesPanel(d));
+
+    // 6. SPECTRAL ANALYSIS
     const specSec=ce('div','spectral-section');
     specSec.innerHTML=renderSpectral(d);
     main.appendChild(specSec);
@@ -3364,6 +3411,182 @@ function drawMiniVel(id,val,velMax,posCol,negCol){
         r.setAttribute('width',len);r.setAttribute('height',h-8);r.setAttribute('rx',2);
         r.setAttribute('fill',val>0?posCol+'0.5)':negCol+'0.4)');svg.appendChild(r);}
     c.appendChild(svg);
+}
+
+// ── FEATURES PANEL ──
+const CHAPTER_TITLES={1:'Identity',9:'Context',18:'Features',24:'Integration',30:'Prediction',33:'Final'};
+
+function renderFeaturesPanel(d){
+    const saeData=d.sae_features;
+    if(!saeData)return`<div class="sec-label">Feature Representation</div><div class="features-card"><div class="features-narr">No SAE data available. Run with SAE analysis enabled.</div></div>`;
+
+    const layers=Object.keys(saeData).map(Number).sort((a,b)=>a-b);
+    const hasHidden=layers.some(l=>saeData[String(l)].hidden_state_top_features?.length>0);
+    const predAA=d.prediction?.top5?.[0]?.aa||'?';
+
+    let html=`<div class="sec-label">Feature Representation</div>`;
+    html+=`<div class="features-card">`;
+
+    // Tabs
+    html+=`<div class="features-tabs">`;
+    html+=`<button class="features-tab active" data-fpane="snapshot">Layer Snapshots</button>`;
+    html+=`<button class="features-tab" data-fpane="compare">Velocity vs. State</button>`;
+    html+=`</div>`;
+
+    // ═══ PANE 1: Layer Snapshots ═══
+    html+=`<div class="features-pane active" id="fp-snapshot">`;
+    if(hasHidden){
+        html+=`<div class="features-narr">The SAE encoder decomposes the hidden state at each checkpoint layer into <em>learned features</em>. These are what the representation <em>contains</em> in the full accumulated state (not the velocity).</div>`;
+        html+=`<div class="features-legend">`;
+        html+=`<span class="features-legend-item"><span class="features-legend-pip" style="background:var(--accent)"></span>In representation</span>`;
+        html+=`<span class="features-legend-item"><span class="features-legend-pip" style="background:var(--writer)"></span>+ answer alignment</span>`;
+        html+=`<span class="features-legend-item"><span class="features-legend-pip" style="background:var(--eraser)"></span>− answer alignment</span>`;
+        html+=`</div>`;
+        html+=`<div class="features-layers">`;
+        layers.forEach(l=>{
+            const lk=String(l);
+            const sae=saeData[lk];
+            const feats=sae.hidden_state_top_features||[];
+            html+=`<div class="features-layer-col">`;
+            html+=`<div class="features-layer-header"><span class="fl-num">L${l}</span><span class="fl-title">${CHAPTER_TITLES[l]||''}</span></div>`;
+            feats.slice(0,8).forEach(f=>{
+                const label=getFeatureLabel(lk,f.id);
+                const summary=label?.summary||'unlabeled';
+                const topAA=label?.top_aas?.[0];
+                const alignCls=f.answer_alignment>=0?'ans-pos':'ans-neg';
+                html+=`<div class="feat-card">`;
+                html+=`<div class="feat-card-id">F${lk}:${f.id}</div>`;
+                html+=`<div class="feat-card-summary">${esc(summary)}</div>`;
+                html+=`<div class="feat-card-meta">`;
+                html+=`<span class="feat-card-badge act">${f.activation.toFixed(1)}</span>`;
+                html+=`<span class="feat-card-badge ${alignCls}">${f.answer_alignment>=0?'+':''}${f.answer_alignment.toFixed(2)} ${predAA}</span>`;
+                if(topAA&&topAA.enrichment>3)html+=`<span class="feat-card-badge vel">${topAA.aa} ${topAA.enrichment.toFixed(0)}×</span>`;
+                html+=`</div></div>`;
+            });
+            html+=`</div>`;
+        });
+        html+=`</div>`;
+    } else {
+        html+=`<div class="features-narr">Hidden-state SAE features not yet generated. Run <code>patch_hidden_sae.py</code> to add encoder-based feature decomposition to each position.</div>`;
+        html+=renderVelocityFallback(d,layers);
+    }
+    html+=`</div>`;
+
+    // ═══ PANE 2: Velocity vs. State ═══
+    html+=`<div class="features-pane" id="fp-compare">`;
+    html+=`<div class="features-narr">At each layer, the model <em>writes</em> some features (velocity) while the representation <em>contains</em> others (state). Features present in the state but <em>not</em> in the velocity were established by earlier layers and persist without active maintenance. Features in the velocity but <em>not</em> in the state are being newly written or are too small to rank in the top activations.</div>`;
+    html+=renderVelocityComparison(d,layers,hasHidden);
+    html+=`</div>`;
+
+    html+=`</div>`;
+    return html;
+}
+
+function renderVelocityFallback(d,layers){
+    // When hidden-state data isn't available, show velocity features
+    let html=`<div class="features-layers">`;
+    layers.forEach(l=>{
+        const lk=String(l);
+        const sae=d.sae_features[lk];
+        const attn=sae.attn_top_features||[];
+        const mlp=sae.mlp_top_features||[];
+        const seen=new Set();
+        const merged=[...attn,...mlp].filter(f=>{if(seen.has(f.id))return false;seen.add(f.id);return true;}).sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj));
+        html+=`<div class="features-layer-col">`;
+        html+=`<div class="features-layer-header"><span class="fl-num">L${l}</span><span class="fl-title">${CHAPTER_TITLES[l]||''}</span></div>`;
+        merged.slice(0,6).forEach(f=>{
+            const label=getFeatureLabel(lk,f.id);
+            const summary=label?.summary||'unlabeled';
+            html+=`<div class="feat-card velocity-only">`;
+            html+=`<div class="feat-card-id">F${lk}:${f.id}</div>`;
+            html+=`<div class="feat-card-summary">${esc(summary)}</div>`;
+            html+=`<div class="feat-card-meta"><span class="feat-card-badge vel">${f.proj>0?'+':''}${f.proj.toFixed(1)} velocity</span></div>`;
+            html+=`</div>`;
+        });
+        html+=`</div>`;
+    });
+    html+=`</div>`;
+    return html;
+}
+
+function renderVelocityComparison(d,layers,hasHidden){
+    let html=`<div class="features-layers">`;
+    layers.forEach(l=>{
+        const lk=String(l);
+        const sae=d.sae_features[lk];
+        const hidden=sae.hidden_state_top_features||[];
+        const attn=sae.attn_top_features||[];
+        const mlp=sae.mlp_top_features||[];
+
+        // Velocity feature IDs
+        const velSeen=new Set();
+        const velMerged=[...attn,...mlp].filter(f=>{if(velSeen.has(f.id))return false;velSeen.add(f.id);return true;});
+        const velIds=new Set(velMerged.map(f=>f.id));
+        const hiddenIds=new Set(hidden.map(f=>f.id));
+
+        html+=`<div class="features-layer-col">`;
+        html+=`<div class="features-layer-header"><span class="fl-num">L${l}</span><span class="fl-title">${CHAPTER_TITLES[l]||''}</span></div>`;
+
+        if(hasHidden&&hidden.length>0){
+            // Categorize hidden features
+            const persistent=hidden.filter(f=>!velIds.has(f.id)&&f.activation>0.5);
+            const shared=hidden.filter(f=>velIds.has(f.id));
+
+            if(shared.length>0){
+                html+=`<div style="font-family:var(--font-mono);font-size:.4rem;color:var(--writer);letter-spacing:.08em;text-transform:uppercase;margin:4px 0 3px">Active + being written</div>`;
+                shared.slice(0,3).forEach(f=>{
+                    const label=getFeatureLabel(lk,f.id);
+                    html+=`<div class="feat-card shared"><div class="feat-card-id">F${lk}:${f.id}</div>`;
+                    html+=`<div class="feat-card-summary">${esc(label?.summary||'unlabeled')}</div>`;
+                    html+=`<div class="feat-card-meta"><span class="feat-card-badge act">${f.activation.toFixed(1)}</span></div></div>`;
+                });
+            }
+            if(persistent.length>0){
+                html+=`<div style="font-family:var(--font-mono);font-size:.4rem;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin:6px 0 3px">Persistent (no velocity)</div>`;
+                persistent.slice(0,3).forEach(f=>{
+                    const label=getFeatureLabel(lk,f.id);
+                    html+=`<div class="feat-card persistent"><div class="feat-card-id">F${lk}:${f.id}</div>`;
+                    html+=`<div class="feat-card-summary">${esc(label?.summary||'unlabeled')}</div>`;
+                    html+=`<div class="feat-card-meta"><span class="feat-card-badge persist">persistent</span><span class="feat-card-badge act">${f.activation.toFixed(1)}</span></div></div>`;
+                });
+            }
+            // Velocity-only (being written but not in top hidden-state features)
+            const velOnly=velMerged.filter(f=>!hiddenIds.has(f.id)&&Math.abs(f.proj)>0.5);
+            if(velOnly.length>0){
+                html+=`<div style="font-family:var(--font-mono);font-size:.4rem;color:var(--mlp-color);letter-spacing:.08em;text-transform:uppercase;margin:6px 0 3px">Velocity only</div>`;
+                velOnly.slice(0,2).forEach(f=>{
+                    const label=getFeatureLabel(lk,f.id);
+                    html+=`<div class="feat-card velocity-only"><div class="feat-card-id">F${lk}:${f.id}</div>`;
+                    html+=`<div class="feat-card-summary">${esc(label?.summary||'unlabeled')}</div>`;
+                    html+=`<div class="feat-card-meta"><span class="feat-card-badge vel">${f.proj>0?'+':''}${f.proj.toFixed(1)} vel</span></div></div>`;
+                });
+            }
+        } else {
+            // No hidden data — show velocity only
+            velMerged.slice(0,5).forEach(f=>{
+                const label=getFeatureLabel(lk,f.id);
+                html+=`<div class="feat-card velocity-only"><div class="feat-card-id">F${lk}:${f.id}</div>`;
+                html+=`<div class="feat-card-summary">${esc(label?.summary||'unlabeled')}</div>`;
+                html+=`<div class="feat-card-meta"><span class="feat-card-badge vel">${f.proj>0?'+':''}${f.proj.toFixed(1)} vel</span></div></div>`;
+            });
+        }
+        html+=`</div>`;
+    });
+    html+=`</div>`;
+    return html;
+}
+
+function initFeaturesPanel(d){
+    // Tab switching
+    document.querySelectorAll('.features-tab').forEach(tab=>{
+        tab.addEventListener('click',()=>{
+            document.querySelectorAll('.features-tab').forEach(t=>t.classList.remove('active'));
+            document.querySelectorAll('.features-pane').forEach(p=>p.classList.remove('active'));
+            tab.classList.add('active');
+            const pane=document.getElementById('fp-'+tab.dataset.fpane);
+            if(pane)pane.classList.add('active');
+        });
+    });
 }
 
 // ── SPECTRAL ANALYSIS PANEL ──

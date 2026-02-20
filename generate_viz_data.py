@@ -1059,12 +1059,35 @@ def extract_position_data(model, tokenizer, sequence, mask_pos, model_info,
         for sae_layer, sae_entry in saes.items():
             model_layer = sae_layer - 1
             W_dec_norm = sae_entry["decoder_norm"]
+            sae_model = sae_entry["sae"]
 
             # Attention aggregate
             attn_vec = fwd["attn_out"].get(model_layer)
             mlp_vec = fwd["mlp_out"].get(model_layer)
 
             layer_sae = {}
+
+            # Hidden-state-level SAE encoding: run the trained encoder on
+            # the full hidden state to find which learned features are
+            # actually active in the representation at this layer.
+            h_state = hs[sae_layer][0, tidx].float().to(DEVICE).unsqueeze(0)
+            with torch.no_grad():
+                _, h_features = sae_model(h_state, output_features=True)
+            h_features = h_features.squeeze(0).cpu()
+            top_hidden = torch.topk(h_features, k=TOP_K_SAE_FEATURES)
+            # For each active feature, also record its answer-direction alignment
+            hidden_top = []
+            for i in range(TOP_K_SAE_FEATURES):
+                fid = int(top_hidden.indices[i])
+                act = float(top_hidden.values[i])
+                dec_dir = W_dec_norm[fid].cpu()
+                ans_align = torch.dot(dec_dir, answer_dir_n).item()
+                hidden_top.append({
+                    "id": fid,
+                    "activation": round(act, 4),
+                    "answer_alignment": round(ans_align, 4),
+                })
+            layer_sae["hidden_state_top_features"] = hidden_top
 
             if attn_vec is not None:
                 attn_v = attn_vec[0, tidx].float().to(DEVICE)
