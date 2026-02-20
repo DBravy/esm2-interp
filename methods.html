@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Methods — ESM-2 Mechanistic Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg:#08090e;--bg-surface:#0d0f16;--bg-card:#11141c;--bg-expand:#151923;--bg-hover:#1a1f2c;
+    --border:#1a2030;--border-hi:#283050;
+    --text:#c0c8da;--text-dim:#58677e;--text-bright:#e8ecf4;--text-muted:#3a4860;
+    --accent:#38bdf8;--accent-dim:rgba(56,189,248,.08);
+    --writer:#2dd4a0;--writer-dim:rgba(45,212,160,.1);
+    --eraser:#f87171;--eraser-dim:rgba(248,113,113,.1);
+    --structural:#22d3ee;--structural-dim:rgba(34,211,238,.08);
+    --coevol:#34d399;--coevol-dim:rgba(52,211,153,.08);
+    --local:#fbbf24;--local-dim:rgba(251,191,36,.08);
+    --mlp-color:#c084fc;--mlp-dim:rgba(192,132,252,.08);
+    --font-mono:'JetBrains Mono',monospace;
+    --font-serif:'Source Serif 4',Georgia,serif;
+    --font-sans:'Instrument Sans',system-ui,sans-serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:18px;-webkit-font-smoothing:antialiased;scroll-behavior:smooth}
+body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
+::selection{background:var(--accent);color:var(--bg)}
+
+/* ── HEADER (matches main page) ── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:52px;
+  background:var(--bg-surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.header-title{font-family:var(--font-mono);font-size:.78rem;color:var(--text-dim);font-weight:300;letter-spacing:.06em}
+.header-title b{color:var(--text-bright);font-weight:600}
+.header-nav{display:flex;gap:6px;align-items:center}
+.header-link{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);text-decoration:none;
+  padding:4px 10px;border-radius:4px;border:1px solid transparent;transition:all .15s;letter-spacing:.04em}
+.header-link:hover{color:var(--text-dim);background:var(--bg-hover);border-color:var(--border)}
+.header-link.active{color:var(--accent);background:var(--accent-dim);border-color:rgba(56,189,248,.2)}
+
+/* ── HERO ── */
+.hero{padding:64px 32px 48px;max-width:820px;margin:0 auto;opacity:0;animation:fadeUp .5s .05s ease forwards}
+.hero-label{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);letter-spacing:.18em;
+  text-transform:uppercase;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.hero-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.hero h1{font-family:var(--font-serif);font-size:2rem;font-weight:400;color:var(--text-bright);
+  line-height:1.35;margin-bottom:16px;letter-spacing:-.01em}
+.hero h1 em{color:var(--accent);font-style:normal;font-weight:500}
+.hero-intro{font-family:var(--font-serif);font-size:.92rem;line-height:1.75;color:var(--text);max-width:640px}
+.hero-intro a{color:var(--accent);text-decoration:none;border-bottom:1px dotted rgba(56,189,248,.3)}
+.hero-intro a:hover{border-bottom-color:var(--accent)}
+
+/* ── PIPELINE OVERVIEW ── */
+.pipeline{max-width:820px;margin:0 auto 48px;padding:0 32px;opacity:0;animation:fadeUp .5s .1s ease forwards}
+.pipeline-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px 32px;position:relative;overflow:hidden}
+.pipeline-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--structural),var(--accent),var(--mlp-color),var(--writer))}
+.pipeline-title{font-family:var(--font-mono);font-size:.56rem;color:var(--text-muted);letter-spacing:.14em;
+  text-transform:uppercase;margin-bottom:16px}
+.pipeline-stages{display:flex;gap:3px;flex-wrap:wrap}
+.pipeline-stage{flex:1;min-width:140px;background:var(--bg);border:1px solid var(--border);border-radius:8px;
+  padding:14px 16px;transition:all .15s;cursor:default}
+.pipeline-stage:hover{border-color:var(--border-hi);background:var(--bg-hover)}
+.pipeline-stage-num{font-family:var(--font-mono);font-size:.5rem;color:var(--text-muted);margin-bottom:4px}
+.pipeline-stage-name{font-family:var(--font-sans);font-size:.76rem;font-weight:600;color:var(--text-bright);margin-bottom:4px}
+.pipeline-stage-desc{font-family:var(--font-serif);font-size:.68rem;color:var(--text-dim);line-height:1.5;font-style:italic}
+
+/* ── TOC ── */
+.toc{max-width:820px;margin:0 auto 48px;padding:0 32px;opacity:0;animation:fadeUp .5s .12s ease forwards}
+.toc-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+@media(max-width:640px){.toc-grid{grid-template-columns:1fr}}
+.toc-item{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:6px;
+  text-decoration:none;transition:all .12s;border:1px solid transparent}
+.toc-item:hover{background:var(--bg-hover);border-color:var(--border)}
+.toc-num{font-family:var(--font-mono);font-size:.56rem;color:var(--text-muted);min-width:20px}
+.toc-name{font-family:var(--font-sans);font-size:.76rem;color:var(--text);font-weight:500}
+.toc-pip{width:4px;height:18px;border-radius:2px;flex-shrink:0}
+
+/* ── METHODS ── */
+.methods{max-width:820px;margin:0 auto;padding:0 32px 120px}
+
+.method{margin-bottom:10px;border-radius:10px;border:1px solid var(--border);overflow:hidden;
+  transition:border-color .2s;opacity:0;animation:fadeUp .4s ease forwards}
+.method:hover{border-color:var(--border-hi)}
+.method.open{border-color:var(--border-hi)}
+
+.method-header{display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer;
+  background:var(--bg-card);transition:background .12s;user-select:none}
+.method-header:hover{background:var(--bg-hover)}
+.method.open .method-header{background:var(--bg-hover);border-bottom:1px solid var(--border)}
+
+.method-pip{width:4px;height:28px;border-radius:2px;flex-shrink:0}
+.method-num{font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);min-width:24px;font-weight:600}
+.method-title-area{flex:1;min-width:0}
+.method-name{font-family:var(--font-sans);font-size:.88rem;font-weight:600;color:var(--text-bright);margin-bottom:2px}
+.method-oneliner{font-family:var(--font-serif);font-size:.72rem;color:var(--text-dim);font-style:italic;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.method-tags{display:flex;gap:4px;flex-shrink:0}
+.method-tag{font-family:var(--font-mono);font-size:.5rem;padding:2px 7px;border-radius:3px;letter-spacing:.04em}
+.method-tag.attn{background:var(--structural-dim);color:var(--structural)}
+.method-tag.mlp{background:var(--mlp-dim);color:var(--mlp-color)}
+.method-tag.sae{background:rgba(251,191,36,.08);color:var(--local)}
+.method-tag.struct{background:var(--coevol-dim);color:var(--coevol)}
+.method-tag.meta{background:rgba(148,163,184,.06);color:var(--text-dim)}
+.method-arrow{font-size:.7rem;color:var(--text-muted);transition:transform .2s;flex-shrink:0}
+.method.open .method-arrow{transform:rotate(90deg)}
+
+.method-body{max-height:0;overflow:hidden;transition:max-height .5s cubic-bezier(.16,1,.3,1),opacity .3s;opacity:0;
+  background:var(--bg-expand)}
+.method.open .method-body{max-height:4000px;opacity:1}
+.method-inner{padding:24px 28px 28px}
+
+/* Summary block */
+.method-summary{font-family:var(--font-serif);font-size:.88rem;line-height:1.75;color:var(--text);margin-bottom:20px}
+.method-summary em{color:var(--accent);font-style:normal;font-weight:500}
+.method-summary strong{color:var(--text-bright);font-weight:500}
+.method-summary code{font-family:var(--font-mono);font-size:.78rem;color:var(--accent);
+  background:rgba(56,189,248,.06);padding:1px 6px;border-radius:3px}
+
+/* Deep dive toggle */
+.deep-dive-toggle{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted);letter-spacing:.08em;
+  text-transform:uppercase;padding:8px 0;margin-bottom:12px;transition:color .15s}
+.deep-dive-toggle:hover{color:var(--accent)}
+.deep-dive-toggle .dd-arrow{display:inline-block;font-size:.5rem;width:10px;text-align:center;transition:transform .2s}
+.deep-dive-toggle.open .dd-arrow{transform:rotate(90deg)}
+.deep-dive{display:none}
+.deep-dive-toggle.open+.deep-dive{display:block}
+
+/* Technical content */
+.tech{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin-bottom:14px}
+.tech-label{font-family:var(--font-mono);font-size:.5rem;color:var(--text-muted);letter-spacing:.12em;
+  text-transform:uppercase;margin-bottom:10px}
+.tech p{font-family:var(--font-serif);font-size:.82rem;line-height:1.7;color:var(--text);margin-bottom:10px}
+.tech p:last-child{margin-bottom:0}
+.tech em{color:var(--accent);font-style:normal;font-weight:500}
+.tech strong{color:var(--text-bright);font-weight:500}
+.tech code{font-family:var(--font-mono);font-size:.72rem;color:var(--accent);
+  background:rgba(56,189,248,.06);padding:1px 5px;border-radius:3px}
+.tech .formula{font-family:var(--font-mono);font-size:.74rem;color:var(--text-bright);
+  background:var(--bg-card);padding:10px 14px;border-radius:6px;margin:10px 0;
+  border:1px solid var(--border);overflow-x:auto;white-space:nowrap;line-height:1.8}
+.tech .formula .sym{color:var(--accent)}
+.tech .formula .op{color:var(--text-dim)}
+.tech .formula .fn{color:var(--mlp-color)}
+.tech .formula .var{color:var(--writer)}
+
+/* What it reveals */
+.reveals{background:linear-gradient(135deg,rgba(56,189,248,.03),rgba(45,212,160,.03));
+  border:1px solid rgba(56,189,248,.1);border-radius:8px;padding:16px 20px;margin-bottom:14px}
+.reveals-label{font-family:var(--font-mono);font-size:.5rem;color:var(--accent);letter-spacing:.12em;
+  text-transform:uppercase;margin-bottom:8px}
+.reveals p{font-family:var(--font-serif);font-size:.82rem;line-height:1.7;color:var(--text)}
+.reveals em{color:var(--accent);font-style:normal;font-weight:500}
+
+/* Implementation note */
+.impl{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px 18px}
+.impl-label{font-family:var(--font-mono);font-size:.5rem;color:var(--text-muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:6px}
+.impl p{font-family:var(--font-mono);font-size:.7rem;line-height:1.65;color:var(--text-dim)}
+.impl code{color:var(--accent);background:rgba(56,189,248,.06);padding:1px 5px;border-radius:3px}
+
+/* Divider between methods */
+.method-divider{height:1px;background:var(--border);margin:28px 0 10px;opacity:.5}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+
+<header class="header">
+    <div class="header-title">ESM-2 <b>Mechanistic Explorer</b></div>
+    <nav class="header-nav">
+        <a class="header-link" href="index.html">Explorer</a>
+        <a class="header-link active" href="methods.html">Methods</a>
+    </nav>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+    <div class="hero-label">Interpretability Methods</div>
+    <h1>How We Open the <em>Black Box</em></h1>
+    <p class="hero-intro">
+        This page documents every interpretability technique used in the ESM-2 Mechanistic Explorer.
+        The pipeline dissects a 650M-parameter protein language model across <em>33 transformer layers × 20 attention heads</em>,
+        decomposing its predictions into attention routing, MLP neuron votes, sparse autoencoder features, and spectral signatures.
+        Each method below is presented with a plain-language summary and a collapsible technical deep dive.
+    </p>
+</section>
+
+<!-- PIPELINE OVERVIEW -->
+<section class="pipeline">
+    <div class="pipeline-card">
+        <div class="pipeline-title">Analysis Pipeline</div>
+        <div class="pipeline-stages">
+            <div class="pipeline-stage">
+                <div class="pipeline-stage-num">01</div>
+                <div class="pipeline-stage-name">Forward Pass</div>
+                <div class="pipeline-stage-desc">Hook all 33 layers: hidden states, attentions, MLP intermediates, value projections</div>
+            </div>
+            <div class="pipeline-stage">
+                <div class="pipeline-stage-num">02</div>
+                <div class="pipeline-stage-name">Decomposition</div>
+                <div class="pipeline-stage-desc">Per-head outputs, MLP neuron census, velocity profiles, source attribution</div>
+            </div>
+            <div class="pipeline-stage">
+                <div class="pipeline-stage-num">03</div>
+                <div class="pipeline-stage-name">Feature Analysis</div>
+                <div class="pipeline-stage-desc">SAE projections, stream detection, spectral decomposition (DCT)</div>
+            </div>
+            <div class="pipeline-stage">
+                <div class="pipeline-stage-num">04</div>
+                <div class="pipeline-stage-name">Validation</div>
+                <div class="pipeline-stage-desc">Cross-position pairwise stream consistency, structural + coevolution overlay</div>
+            </div>
+            <div class="pipeline-stage">
+                <div class="pipeline-stage-num">05</div>
+                <div class="pipeline-stage-name">Narrative</div>
+                <div class="pipeline-stage-desc">Claude synthesizes the numerical data into interpretive explanations</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- TOC -->
+<section class="toc">
+    <div class="toc-grid">
+        <a class="toc-item" href="#logit-lens"><span class="toc-pip" style="background:var(--accent)"></span><span class="toc-num">01</span><span class="toc-name">Logit Lens</span></a>
+        <a class="toc-item" href="#velocity"><span class="toc-pip" style="background:var(--accent)"></span><span class="toc-num">02</span><span class="toc-name">Velocity Decomposition</span></a>
+        <a class="toc-item" href="#per-head"><span class="toc-pip" style="background:var(--structural)"></span><span class="toc-num">03</span><span class="toc-name">Per-Head Output Decomposition</span></a>
+        <a class="toc-item" href="#attn-source"><span class="toc-pip" style="background:var(--structural)"></span><span class="toc-num">04</span><span class="toc-name">Attention Source Categorization</span></a>
+        <a class="toc-item" href="#mlp-neurons"><span class="toc-pip" style="background:var(--mlp-color)"></span><span class="toc-num">05</span><span class="toc-name">MLP Neuron Census</span></a>
+        <a class="toc-item" href="#sae"><span class="toc-pip" style="background:var(--local)"></span><span class="toc-num">06</span><span class="toc-name">SAE Feature Projections</span></a>
+        <a class="toc-item" href="#streams"><span class="toc-pip" style="background:var(--accent)"></span><span class="toc-num">07</span><span class="toc-name">Orthogonal Stream Analysis</span></a>
+        <a class="toc-item" href="#spectral"><span class="toc-pip" style="background:var(--mlp-color)"></span><span class="toc-num">08</span><span class="toc-name">Spectral Analysis (DCT)</span></a>
+        <a class="toc-item" href="#structural"><span class="toc-pip" style="background:var(--coevol)"></span><span class="toc-num">09</span><span class="toc-name">Structural Contacts</span></a>
+        <a class="toc-item" href="#coevolution"><span class="toc-pip" style="background:var(--coevol)"></span><span class="toc-num">10</span><span class="toc-name">Coevolution (MI + APC)</span></a>
+        <a class="toc-item" href="#pairwise"><span class="toc-pip" style="background:var(--writer)"></span><span class="toc-num">11</span><span class="toc-name">Pairwise Stream Validation</span></a>
+        <a class="toc-item" href="#narrative"><span class="toc-pip" style="background:var(--writer)"></span><span class="toc-num">12</span><span class="toc-name">LLM Narrative Synthesis</span></a>
+    </div>
+</section>
+
+<!-- METHODS -->
+<section class="methods">
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 01 LOGIT LENS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="logit-lens" style="animation-delay:.14s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--accent)"></div>
+        <div class="method-num">01</div>
+        <div class="method-title-area">
+            <div class="method-name">Logit Lens (Running Predictions)</div>
+            <div class="method-oneliner">Watching the prediction evolve layer by layer through the full LM head</div>
+        </div>
+        <div class="method-tags"><span class="method-tag meta">core</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            At every layer, the model has a <em>hidden state</em> — a 1280-dimensional vector that represents its current "belief" about the masked position.
+            The logit lens passes each layer's hidden state through the model's <strong>full LM head</strong> (dense → GELU → LayerNorm → unembedding)
+            to decode a probability distribution over the 20 amino acids. This produces a <em>running prediction</em> that shows how the model's
+            answer forms and evolves across all 33 layers — from an initial embedding guess to a confident final prediction.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Procedure</div>
+                <p>For each layer <em>ℓ</em> ∈ {0, 1, …, 33}, extract the hidden state <code>h[ℓ]</code> at the masked token position.
+                Pass it through the model's complete <code>lm_head</code> module — not just the raw unembedding matrix — to obtain logits,
+                then apply softmax to get per-amino-acid probabilities.</p>
+                <div class="formula">
+                    P<sub>ℓ</sub>(aa) = <span class="fn">softmax</span>(<span class="fn">LM_head</span>(<span class="sym">h</span><sub>ℓ</sub>))[<span class="var">token_id</span>(aa)]
+                </div>
+                <p>Using the full LM head (rather than just <code>W_unembed · h</code>) is critical because ESM-2's LM head includes
+                a dense layer, GELU activation, and LayerNorm before the final linear projection. Skipping these nonlinearities
+                produces misleading probability trajectories — particularly in early layers where the hidden states haven't yet adapted
+                to the unembedding space.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals in the explorer</div>
+                <p>The "prediction race chart" in the Equation section shows amino acids competing across depth.
+                Lead changes identify where the model's representation shifts — for instance, when a position transitions from
+                encoding <em>generic polar character</em> to committing to a <em>specific hydrophobic residue</em>.
+                This is the backbone for narrative generation: every turning point in the race corresponds to a mechanistic event.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p><code>extract_position_data()</code> → lines 810–817 of <code>generate_viz_data.py</code>. Stores as <code>running_predictions</code>: a dict mapping each amino acid to a list of 34 probability values (one per layer, including the embedding layer).</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 02 VELOCITY DECOMPOSITION -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="velocity" style="animation-delay:.16s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--accent)"></div>
+        <div class="method-num">02</div>
+        <div class="method-title-area">
+            <div class="method-name">Velocity Decomposition</div>
+            <div class="method-oneliner">Measuring how fast and in what direction the residual stream moves toward the answer</div>
+        </div>
+        <div class="method-tags"><span class="method-tag attn">attn</span><span class="method-tag mlp">mlp</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            Each transformer layer adds a <em>delta</em> to the residual stream — a vector update that nudges the representation in some direction.
+            The velocity profile projects these deltas onto the <strong>correct amino acid's unembedding direction</strong>, telling us how much
+            each layer moves the model's representation <em>toward</em> or <em>away from</em> the correct answer. This is then split into the
+            <em>attention contribution</em> and the <em>MLP contribution</em>, revealing which component at which layer writes (or erases) the prediction.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Computation</div>
+                <p>The residual stream hidden states form a trajectory <code>h[0], h[1], …, h[33]</code>. The velocity at layer <em>ℓ</em> is simply the difference:
+                <code>Δh[ℓ] = h[ℓ] − h[ℓ−1]</code>. We define the <em>answer direction</em> as the L2-normalized unembedding vector for the correct amino acid.</p>
+                <div class="formula">
+                    <span class="var">d</span><sub>answer</sub> = <span class="sym">W</span><sub>unembed</sub>[correct_aa] / ‖<span class="sym">W</span><sub>unembed</sub>[correct_aa]‖
+                </div>
+                <div class="formula">
+                    velocity(ℓ) = <span class="sym">Δh</span>[ℓ] · <span class="var">d</span><sub>answer</sub>
+                </div>
+                <p>Because each layer's update decomposes as <code>Δh[ℓ] = attn_out[ℓ] + mlp_out[ℓ]</code> (plus a small LayerNorm residual),
+                we also compute component-wise projections:</p>
+                <div class="formula">
+                    attn_vel(ℓ) = <span class="sym">attn_out</span>[ℓ] · <span class="var">d</span><sub>answer</sub> &nbsp;&nbsp;│&nbsp;&nbsp; mlp_vel(ℓ) = <span class="sym">mlp_out</span>[ℓ] · <span class="var">d</span><sub>answer</sub>
+                </div>
+                <p>Additionally, the cosine similarity between the attention and MLP outputs is computed at each layer — when this is negative,
+                the two components are working in <em>opposing</em> directions, often indicating the MLP is correcting or refining what attention wrote.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>The velocity chart highlights the <em>writing layers</em> (large positive projections) and <em>erasing layers</em> (large negative projections).
+                A common pattern in ESM-2: attention writes broadly in mid layers, then the MLP provides targeted corrections in late layers. The
+                attn–MLP cosine panel exposes layers where the two components actively fight, which often correspond to interesting biological decisions.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p>Lines 738–756 of <code>generate_viz_data.py</code>. Hooks on <code>layer.attention.output.dense</code> and <code>layer.output.dense</code> capture component-level outputs. Stored as <code>velocity.answer</code>, <code>velocity.attention</code>, <code>velocity.mlp</code>, and <code>velocity.attn_mlp_cosine</code>.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 03 PER-HEAD OUTPUT DECOMPOSITION -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="per-head" style="animation-delay:.18s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--structural)"></div>
+        <div class="method-num">03</div>
+        <div class="method-title-area">
+            <div class="method-name">Per-Head Output Decomposition</div>
+            <div class="method-oneliner">Reconstructing each attention head's individual contribution to the prediction</div>
+        </div>
+        <div class="method-tags"><span class="method-tag attn">attn</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            A layer's attention output is the sum of 20 heads. We decompose it to see exactly which heads push the prediction
+            <em>toward</em> the correct answer (<strong>writers</strong>, shown in green) and which push it <em>away</em>
+            (<strong>erasers</strong>, shown in red). This produces a 33×20 matrix — the heatmap in the Layer Explorer — where
+            every cell quantifies one head's signed contribution to the correct amino acid's logit.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Reconstruction</div>
+                <p>For each head <em>h</em> at layer <em>ℓ</em>, we reconstruct the full-dimensional output vector by combining the
+                attention-weighted value vectors with that head's slice of the output projection matrix <code>W_O</code>:</p>
+                <div class="formula">
+                    <span class="sym">context</span><sub>h</sub> = Σ<sub>j</sub> <span class="fn">attn</span>(q<sub>mask</sub>, k<sub>j</sub>) · <span class="sym">v</span><sub>j</sub> &nbsp;&nbsp;∈ ℝ<sup>64</sup>
+                </div>
+                <div class="formula">
+                    <span class="sym">head_out</span><sub>h</sub> = <span class="sym">context</span><sub>h</sub> · <span class="sym">W</span><sub>O[h]</sub><sup>T</sup> + <span class="sym">b</span><sub>O</sub>/20 &nbsp;&nbsp;∈ ℝ<sup>1280</sup>
+                </div>
+                <p>The answer projection is then the dot product with the normalized answer direction:</p>
+                <div class="formula">
+                    proj(ℓ, h) = <span class="sym">head_out</span><sub>h</sub> · <span class="var">d</span><sub>answer</sub>
+                </div>
+                <p>The bias term is split equally across heads (÷20). This decomposition is exact — summing all 20 heads' outputs
+                recovers the full attention layer output (up to LayerNorm effects).</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>The 33×20 answer projection matrix is the centerpiece of the Layer Explorer. Significant heads (|proj| ≥ 0.3) are
+                classified as writers or erasers and displayed in the chapter sections. This decomposition identifies specific head circuits
+                — for example, a structural writer at L28H14 that attends to 3D contacts and votes strongly for the correct residue.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p><code>decompose_heads_at_layer()</code> at line 656. Uses hooked value projections reshaped to <code>(batch, n_heads, seq, head_dim)</code> and slices <code>W_O[:, h*64:(h+1)*64]</code> per head. Run for all 33 layers × 20 heads = 660 decompositions per position.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 04 ATTENTION SOURCE CATEGORIZATION -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="attn-source" style="animation-delay:.2s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--structural)"></div>
+        <div class="method-num">04</div>
+        <div class="method-title-area">
+            <div class="method-name">Attention Source Categorization</div>
+            <div class="method-oneliner">Classifying where each head looks: structural contacts, co-evolving sites, or local neighbors</div>
+        </div>
+        <div class="method-tags"><span class="method-tag attn">attn</span><span class="method-tag struct">struct</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            Knowing <em>what</em> a head writes is only half the story — we also need to know <em>where</em> it reads from.
+            For each significant head, we examine its attention weights over the protein sequence and classify the attended positions
+            into three biologically meaningful categories: <em>structural contacts</em> (3D-proximal residues from PDB),
+            <em>co-evolving sites</em> (evolutionary coupling from MSA), and <em>local neighbors</em> (±5 residues in sequence).
+            The head is then typed — e.g., "structural writer" or "coevolutionary eraser" — based on the dominant source category.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Classification logic</div>
+                <p>For each head, the attention distribution <code>attn[h, mask_pos, :]</code> is extracted (restricted to sequence positions,
+                excluding CLS/EOS tokens). Attention weight is summed over three predefined sets:</p>
+                <p><strong>Structural</strong> (Σ attn to positions within 8Å C-alpha distance), <strong>Co-evolving</strong>
+                (Σ attn to high-MI partner positions), <strong>Local</strong> (Σ attn to positions within ±5 in sequence).</p>
+                <p>Thresholds: structural > 0.10, co-evolving > 0.10, local > 0.15. Combined with the sign of the answer projection,
+                this yields types like <code>structural_writer</code>, <code>coevol_eraser</code>, <code>local_writer</code>, or
+                <code>write_without_clear_source</code> when no category dominates.</p>
+                <p>A weighted importance map is also computed: for each source position, its importance is the sum of
+                <code>|head_answer_proj| × attn_weight</code> across all heads. This produces the sequence bar coloring in the Explorer.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>This is the biological interpretability bridge. When a head at layer 28 attends primarily to 3D-proximal residues and writes strongly
+                toward leucine, we can say the model has learned to <em>read structural context</em> for this prediction. The source importance map
+                shows which residues, across the entire protein, most influenced the prediction at a given position.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p>Lines 829–898 of <code>generate_viz_data.py</code>. Classification at lines 908–954. The <code>source_importance</code> dict stores per-position totals, structural signal, and co-evolving signal arrays. Head-level details stored in <code>head_attention_sources</code> for significant heads only (|proj| ≥ 0.3).</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 05 MLP NEURON CENSUS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="mlp-neurons" style="animation-delay:.22s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--mlp-color)"></div>
+        <div class="method-num">05</div>
+        <div class="method-title-area">
+            <div class="method-name">MLP Neuron Census</div>
+            <div class="method-oneliner">Profiling every active neuron's vote across the amino acid vocabulary</div>
+        </div>
+        <div class="method-tags"><span class="method-tag mlp">mlp</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            Each MLP layer has 5,120 neurons. After the GELU activation, each active neuron multiplies its activation by a column of the
+            down-projection matrix, contributing a vector to the residual stream. By projecting each neuron's contribution onto the
+            <strong>answer direction</strong> (and onto <em>all 20</em> amino acid directions), we get a neuron-by-neuron census of who
+            is voting for what — revealing the top <em>writers</em> (neurons boosting the correct answer) and <em>erasers</em> (neurons suppressing it).
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Per-neuron decomposition</div>
+                <p>For each neuron <em>i</em> in layer <em>ℓ</em>'s MLP at the masked position:</p>
+                <div class="formula">
+                    <span class="sym">contrib</span><sub>i</sub> = <span class="fn">GELU</span>(x · <span class="sym">W</span><sub>up</sub>[i])<sub>masked_pos</sub> · <span class="sym">W</span><sub>down</sub>[:, i] &nbsp;&nbsp;∈ ℝ<sup>1280</sup>
+                </div>
+                <div class="formula">
+                    answer_proj<sub>i</sub> = <span class="sym">contrib</span><sub>i</sub> · <span class="var">d</span><sub>answer</sub>
+                </div>
+                <p>The activation value (post-GELU) is captured via a hook on <code>layer.intermediate</code>, and <code>W_down</code> is the
+                down-projection weight matrix (<code>layer.output.dense.weight</code>). The top-20 writers and top-20 erasers are retained,
+                along with each neuron's projection onto all 20 amino acid directions (its "amino acid voting profile").</p>
+                <p>Neurons where <code>activation == 0</code> (killed by GELU) are skipped entirely. Typically ~2,000–3,000 of the 5,120 neurons
+                are active at any given position.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>MLP neurons often encode remarkably specific patterns. A single neuron might vote strongly for leucine and valine while erasing
+                serine and glycine — acting as a "hydrophobic identity" neuron. The census makes it possible to trace the final prediction
+                back to individual neurons, especially in the decisive late layers (L29–L33) where MLP contributions dominate.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p>Lines 1110–1165. Iterates all 33 layers, extracting <code>intermediate</code> activations (5120d post-GELU) and computing per-neuron contributions. Stored as <code>mlp_neurons[layer].top_writers</code> and <code>.top_erasers</code>, each with activation, answer_proj, and top-5 amino acid votes.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 06 SAE FEATURE PROJECTIONS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="sae" style="animation-delay:.24s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--local)"></div>
+        <div class="method-num">06</div>
+        <div class="method-title-area">
+            <div class="method-name">SAE Feature Projections</div>
+            <div class="method-oneliner">Sparse autoencoder features from InterPLM decomposing what the model represents</div>
+        </div>
+        <div class="method-tags"><span class="method-tag sae">sae</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            Sparse Autoencoders (SAEs) learn an overcomplete dictionary of <em>features</em> — interpretable directions in the model's
+            representation space. We use pre-trained SAEs from the <strong>InterPLM</strong> project (trained on ESM-2 650M) at six key layers
+            (1, 9, 18, 24, 30, 33). For each layer, we project both the attention output and MLP output onto the SAE decoder directions,
+            revealing which learned features are active and how strongly. We also decompose individual head outputs onto these features,
+            connecting specific heads to specific semantic concepts.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Projection method</div>
+                <p>Each SAE has a decoder matrix <code>W_dec</code> ∈ ℝ<sup>N_features × 1280</sup>. We normalize each row to unit length,
+                then compute projections:</p>
+                <div class="formula">
+                    proj<sub>f</sub> = <span class="sym">x</span> · <span class="sym">W</span><sub>dec_norm</sub>[f]
+                </div>
+                <p>where <code>x</code> is the attention output, MLP output, or individual head output at the masked position.
+                The top-20 features by projection magnitude are retained for attention and MLP; top-10 writing and top-5 erasing features
+                are stored per head.</p>
+                <p>These are <em>not</em> SAE activations (which would require encoding). They are cosine-similarity-weighted projections
+                that measure how aligned a given model vector is with each learned feature direction. This is faster and more appropriate
+                for decomposing component outputs rather than full hidden states.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>SAE features provide the most human-interpretable layer of analysis. A feature labeled "hydrophobic core residues in beta sheets"
+                activating strongly in the attention output at layer 24 tells a concrete story about <em>what</em> the model is representing,
+                not just <em>how much</em> it contributes to the answer. Features are matched to human-readable labels from a separate labeling pipeline.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p>SAE loading at lines 497–549 via <code>interplm.sae.dictionary.ReLUSAE</code> from HuggingFace (<code>Elana/InterPLM-esm2-650m</code>). Projections at lines 1057–1108. Per-head features require storing head output vectors at SAE layers during the main decomposition loop.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 07 ORTHOGONAL STREAM ANALYSIS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="streams" style="animation-delay:.26s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--accent)"></div>
+        <div class="method-num">07</div>
+        <div class="method-title-area">
+            <div class="method-name">Orthogonal Stream Analysis</div>
+            <div class="method-oneliner">Detecting independent computational streams among heads at each layer</div>
+        </div>
+        <div class="method-tags"><span class="method-tag attn">attn</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            Not all heads at a layer work toward the same goal. Some heads compute in geometrically <em>independent subspaces</em> — their
+            output vectors are nearly orthogonal to the rest. The stream analysis detects these splits by computing each head's cosine similarity
+            to the layer centroid, identifying <strong>isolated heads</strong> (cosine &lt; 0.1 to centroid) that form separate computational
+            streams. When the inter-stream cosine is near zero, the heads are doing genuinely independent computations in the 1280-dimensional space.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Stream detection</div>
+                <p>At each layer, compute the centroid of all 20 head output vectors (unweighted mean). Each head's cosine similarity to this
+                centroid measures its alignment with the "mainstream" computation:</p>
+                <div class="formula">
+                    centroid<sub>ℓ</sub> = <span class="fn">mean</span>(<span class="sym">head_out</span><sub>0</sub>, …, <span class="sym">head_out</span><sub>19</sub>)
+                </div>
+                <div class="formula">
+                    cos_centroid(ℓ, h) = <span class="fn">cos_sim</span>(<span class="sym">head_out</span><sub>h</sub>, centroid<sub>ℓ</sub>)
+                </div>
+                <p>If any head has <code>cos_centroid &lt; 0.1</code> and magnitude &gt; 0.5, a stream split is detected.
+                The isolated head's direction is used to cluster other heads (those with cosine &gt; 0.3 to it join the isolated stream).
+                The two stream aggregates' inter-stream cosine is computed to quantify the geometric independence.</p>
+                <p>A cross-layer profile is also computed: for each head, its centroid cosine across all 33 layers, revealing "ejection trajectories"
+                where a head gradually diverges from the mainstream computation.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>Stream separation is a hallmark of the <em>superposition hypothesis</em> in practice. When one stream writes the correct amino acid
+                while an orthogonal stream encodes structural context or alternative hypotheses, the model is computing multiple things in parallel
+                within the same layer. The explorer shows these as stream sections in the chapter cards.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p>Lines 958–1051. Pairwise cosine matrix computed via normalized head vectors. Stream info stored in <code>stream_analysis.layer_streams</code> with main/isolated head lists, inter-stream cosine, and magnitudes. Cross-layer profiles stored for heads that ever drop below 0.2 cosine to centroid.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 08 SPECTRAL ANALYSIS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="spectral" style="animation-delay:.28s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--mlp-color)"></div>
+        <div class="method-num">08</div>
+        <div class="method-title-area">
+            <div class="method-name">Spectral Analysis (DCT)</div>
+            <div class="method-oneliner">Frequency decomposition of the hidden-state trajectory across depth</div>
+        </div>
+        <div class="method-tags"><span class="method-tag meta">core</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            The hidden state trajectory across 34 depth points (embedding + 33 layers) can be viewed as a <em>signal</em> over the depth axis.
+            Applying a Discrete Cosine Transform (DCT) decomposes this trajectory into frequency components: <strong>low frequencies</strong>
+            capture the broad drift of the representation (e.g., the overall shift toward hydrophobic character), while <strong>high frequencies</strong>
+            capture rapid layer-to-layer oscillations. Separate DCTs on the cumulative attention and MLP trajectories reveal which component
+            operates at which frequency scale.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Three spectral views</div>
+                <p><strong>1. Total power spectrum:</strong> DCT-II applied to the full hidden-state trajectory <code>h[0:34]</code> ∈ ℝ<sup>34×1280</sup>,
+                then L2 norm of each frequency's 1280-d coefficient vector gives the power at that frequency.</p>
+                <div class="formula">
+                    <span class="sym">C</span> = <span class="fn">DCT</span>(<span class="sym">h</span>[0:34], axis=0) &nbsp;&nbsp;│&nbsp;&nbsp; power(k) = ‖<span class="sym">C</span>[k]‖₂
+                </div>
+                <p><strong>2. Attn/MLP spectral decomposition:</strong> Cumulative trajectories are built by summing attention (or MLP) outputs
+                layer by layer, then DCT'd separately. This reveals whether attention operates at lower or higher frequency than MLP.</p>
+                <p><strong>3. Answer-direction spectral profile:</strong> DCT coefficients projected onto the answer direction.
+                This shows which frequency bands carry the prediction signal — a position predicted with high confidence typically concentrates
+                answer energy in low frequencies (smooth, monotonic approach).</p>
+                <div class="formula">
+                    answer_spectral(k) = <span class="sym">C</span>[k] · <span class="var">d</span><sub>answer</sub>
+                </div>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>Spectral analysis provides a bird's-eye view of <em>how</em> the model converges on a prediction. A smooth, low-frequency answer spectrum
+                means the model builds confidence gradually. A high-frequency answer spectrum means there are rapid oscillations — the model repeatedly
+                writes and erases, suggesting competing evidence or conflicting circuits. The attn/MLP split reveals which component creates the
+                oscillations and which provides the smooth trend.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p>Lines 758–803 using <code>scipy.fft.dct</code> (type II, ortho-normalized). Six arrays stored in the <code>spectral</code> object: total/attn/mlp power envelopes and total/attn/mlp answer projections, each of length 34 (one per frequency index).</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 09 STRUCTURAL CONTACTS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="structural" style="animation-delay:.3s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--coevol)"></div>
+        <div class="method-num">09</div>
+        <div class="method-title-area">
+            <div class="method-name">Structural Contacts (PDB)</div>
+            <div class="method-oneliner">3D proximity from X-ray crystallography as ground truth for attention analysis</div>
+        </div>
+        <div class="method-tags"><span class="method-tag struct">struct</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            The model never sees 3D coordinates — it only reads the amino acid sequence. Yet, to test whether attention heads have learned
+            to implicitly encode structural information, we overlay <strong>real structural contacts</strong> from PDB crystal structures.
+            C-alpha atom distances are computed for all residue pairs, and pairs within <em>8Å</em> (excluding trivially local ±2 neighbors)
+            are marked as structural contacts. This is the ground truth that lets us classify heads as "structural."
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">PDB parsing</div>
+                <p>The PDB file (e.g., 1UBQ for ubiquitin) is downloaded from RCSB and parsed for ATOM records with atom name <code>CA</code>
+                (C-alpha) in chain A. The (x, y, z) coordinates are extracted and converted to 0-indexed positions.</p>
+                <div class="formula">
+                    contact(i, j) = ‖<span class="sym">CA</span><sub>i</sub> − <span class="sym">CA</span><sub>j</sub>‖₂ &lt; 8.0Å &nbsp;&nbsp;∧&nbsp;&nbsp; |i − j| &gt; 2
+                </div>
+                <p>The sequence separation filter (|i − j| > 2) removes trivially local contacts that would be present in any folded protein.
+                The resulting contact map is symmetric and stored as an adjacency list: position → list of contact positions.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>Structural contacts are shown as cyan-highlighted residues in the sequence bar. When attention heads focus their weight on these
+                contacts, it provides evidence that ESM-2 has learned implicit structural reasoning from sequence data alone — a central
+                claim about protein language models that this explorer makes tangible and inspectable.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p><code>compute_structural_contacts()</code> at line 100. Downloads PDB from <code>https://files.rcsb.org/download/</code>, parses CA coordinates, computes all-pairs Euclidean distances. Default cutoff: 8.0Å. Stored in <code>metadata.json</code> and per-position <code>annotations.structural_contacts</code>.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 10 COEVOLUTION -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="coevolution" style="animation-delay:.32s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--coevol)"></div>
+        <div class="method-num">10</div>
+        <div class="method-title-area">
+            <div class="method-name">Coevolution (MI + APC)</div>
+            <div class="method-oneliner">Mutual information from multiple sequence alignments captures evolutionary coupling</div>
+        </div>
+        <div class="method-tags"><span class="method-tag struct">struct</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            Residues that are in physical contact or functionally linked tend to mutate in coordinated ways across evolution — if one changes,
+            the other must compensate. <strong>Mutual Information (MI)</strong> quantifies this statistical coupling from a Multiple Sequence
+            Alignment (MSA) of homologous proteins. We apply the <em>Average Product Correction</em> (APC) to remove phylogenetic background
+            signal, yielding a corrected MI matrix. The top-K co-evolving partners per position become the second biological annotation layer,
+            complementing the structural contacts.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">MI computation with APC</div>
+                <p>From a Pfam MSA (Stockholm format, e.g. PF00240 for ubiquitin), single-column amino acid frequencies <code>f(a)</code> and
+                pairwise joint frequencies <code>f(a,b)</code> are computed with pseudocounts (+1/20).</p>
+                <div class="formula">
+                    MI(i,j) = Σ<sub>a,b</sub> <span class="sym">f</span>(a,b) · <span class="fn">log</span>(<span class="sym">f</span>(a,b) / (<span class="sym">f</span>(a) · <span class="sym">f</span>(b)))
+                </div>
+                <p>The APC correction removes the artifact where highly variable columns show spuriously high MI with everything:</p>
+                <div class="formula">
+                    MI<sub>corrected</sub>(i,j) = MI(i,j) − (<span class="fn">mean</span><sub>row</sub>(i) · <span class="fn">mean</span><sub>row</sub>(j)) / <span class="fn">mean</span><sub>overall</sub>
+                </div>
+                <p>Positions within ±5 residues are excluded (local coupling is trivially high). For each position, the top-K partners above
+                an MI threshold (default 0.1, or 0.15 for Pfam seeds) are retained. Curated annotations for well-studied positions
+                (e.g., K48, G76, I44 in ubiquitin) are merged on top.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>Co-evolving positions are shown as green-highlighted residues in the sequence bar. They represent a different axis of
+                biological information than structural contacts: two residues can co-evolve without being physically proximal (e.g., allosteric coupling).
+                When attention heads attend to co-evolving sites and write toward the correct amino acid, it suggests the model has learned
+                evolutionary coupling patterns from its training data.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p><code>compute_coevolution_from_msa()</code> at line 298. MSA downloaded from InterPro/Pfam API. Reference sequence mapped via identity scoring. The pipeline also supports pre-computed coevolution JSON from a separate <code>precompute_coevolution.py</code> script for faster iteration. Stored in <code>annotations.coevolving_positions</code>.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 11 PAIRWISE STREAM VALIDATION -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="pairwise" style="animation-delay:.34s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--writer)"></div>
+        <div class="method-num">11</div>
+        <div class="method-title-area">
+            <div class="method-name">Pairwise Stream Validation</div>
+            <div class="method-oneliner">Cross-position consistency check to distinguish genuine circuits from noise</div>
+        </div>
+        <div class="method-tags"><span class="method-tag meta">meta</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            A stream split detected at a single position could be a genuine computational circuit or an artifact of that particular input.
+            The pairwise validation stage compares stream structure <em>across all analyzed positions</em>. If the same heads consistently
+            form the same clusters across different masked positions, the stream is likely a real structural feature of the model.
+            Metrics like <strong>consistency</strong> (how often the same head grouping appears) and <strong>detection rate</strong>
+            (fraction of positions showing the stream) quantify reliability.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Validation procedure</div>
+                <p>After all per-position analyses are complete, this post-processing stage:</p>
+                <p><strong>1.</strong> Loads all <code>pos_*.json</code> files and extracts per-head output vectors at each layer.
+                <strong>2.</strong> For each layer, groups positions by which heads they identified as "main" vs "isolated" streams.
+                <strong>3.</strong> Computes cosine similarity between stream aggregate vectors across positions.
+                <strong>4.</strong> Reports consistency (fraction of positions where the core heads match the most common grouping)
+                and detection rate (fraction of positions showing any stream split at that layer).</p>
+                <p>Validated stream metadata is patched back into each position's JSON file, adding <code>consistency</code> and
+                <code>detection_rate</code> fields that the frontend uses to grade stream reliability.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>This is the quality control layer. A stream with 95% consistency across 76 positions is a robust model property;
+                a stream detected at only 2 positions is likely noise. The explorer uses these metrics to calibrate its confidence
+                when presenting stream analysis in the narratives.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p>Stage A in <code>main()</code>, lines 1596–1699. Loads all position JSONs, collects per-head vectors, computes cross-position cosine matrices, and patches validated metadata. Runs after the main per-position loop completes.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- 12 NARRATIVE SYNTHESIS -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="method" id="narrative" style="animation-delay:.36s">
+    <div class="method-header" onclick="toggleMethod(this)">
+        <div class="method-pip" style="background:var(--writer)"></div>
+        <div class="method-num">12</div>
+        <div class="method-title-area">
+            <div class="method-name">LLM Narrative Synthesis</div>
+            <div class="method-oneliner">Claude interprets the numerical data into human-readable mechanistic stories</div>
+        </div>
+        <div class="method-tags"><span class="method-tag meta">meta</span></div>
+        <div class="method-arrow">▶</div>
+    </div>
+    <div class="method-body"><div class="method-inner">
+        <div class="method-summary">
+            Raw numbers — 660 head projections, thousands of neuron votes, spectral coefficients — are difficult to interpret in isolation.
+            The final pipeline stage sends each position's complete analysis to <strong>Claude</strong> (Sonnet) with a structured prompt
+            that includes the velocity profile, running predictions, head classifications, MLP census, SAE features, and biological annotations.
+            Claude produces a narrative with a headline, evidence summary, per-candidate trajectories with explanations, turning points,
+            deep-dive suggestions, and a resolution — the interpretive text that appears in the "Equation" section of the explorer.
+        </div>
+        <div class="deep-dive-toggle" onclick="toggleDive(this)"><span class="dd-arrow">▶</span> Technical deep dive</div>
+        <div class="deep-dive">
+            <div class="tech">
+                <div class="tech-label">Prompt construction</div>
+                <p>The <code>build_prompt()</code> function in <code>generate_narratives.py</code> assembles a structured prompt containing:</p>
+                <p><strong>Context:</strong> protein name, sequence, position, correct amino acid, and prediction confidence.
+                <strong>Velocity data:</strong> layer-by-layer attention and MLP answer projections.
+                <strong>Race data:</strong> running predictions for all 20 amino acids, lead changes, trajectory summaries.
+                <strong>Head events:</strong> all classified writing events with their source types and projections.
+                <strong>MLP census:</strong> top writers and erasers at key layers with amino acid voting profiles.
+                <strong>SAE features:</strong> top features at each SAE layer with human-readable labels from the feature database.
+                <strong>Structural/evolutionary context:</strong> which contacts and co-evolving positions are relevant.</p>
+                <p>Claude returns structured JSON with specific fields that map directly to the explorer's UI components.</p>
+            </div>
+            <div class="tech">
+                <div class="tech-label">Post-processing: ref qualification</div>
+                <p>Stage C qualifies bare references like "F5372" into layer-qualified refs like "F18:5372" by matching feature IDs against
+                the per-position SAE data. This ensures every feature and neuron reference in the narrative links correctly to the
+                interactive tooltips in the explorer.</p>
+            </div>
+            <div class="reveals">
+                <div class="reveals-label">What it reveals</div>
+                <p>The narrative layer transforms a quantitative analysis into a <em>mechanistic story</em> — explaining not just that layer 22 matters,
+                but <em>why</em> it matters (the perception-to-decision transition), connecting numerical evidence to biological reasoning.
+                This is what makes the explorer accessible beyond the interpretability research community.</p>
+            </div>
+            <div class="impl">
+                <div class="impl-label">Implementation</div>
+                <p><code>generate_narratives.py</code> (full file). Uses the Anthropic Python SDK. Model: <code>claude-sonnet-4-5-20250929</code> by default. Rate-limited to ~1 request/second. Stage B in <code>generate_viz_data.py</code> main(), lines 1709–1797. Ref qualification in Stage C, lines 1805–1852.</p>
+            </div>
+        </div>
+    </div></div>
+</div>
+
+</section>
+
+<script>
+function toggleMethod(header) {
+    const method = header.parentElement;
+    method.classList.toggle('open');
+}
+
+function toggleDive(toggle) {
+    toggle.classList.toggle('open');
+}
+
+// Stagger animation delays
+document.querySelectorAll('.method').forEach((m, i) => {
+    m.style.animationDelay = (0.14 + i * 0.03) + 's';
+});
+
+// Smooth scroll for TOC links
+document.querySelectorAll('.toc-item').forEach(a => {
+    a.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) {
+            const method = target;
+            const y = method.getBoundingClientRect().top + window.scrollY - 70;
+            window.scrollTo({ top: y, behavior: 'smooth' });
+            // Auto-open the method
+            setTimeout(() => {
+                if (!method.classList.contains('open')) {
+                    method.classList.add('open');
+                }
+            }, 400);
+        }
+    });
+});
+</script>
+
+</body>
+</html>

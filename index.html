@@ -35,6 +35,11 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflo
 .header-title{font-family:var(--font-mono);font-size:.78rem;color:var(--text-dim);font-weight:300;letter-spacing:.06em}
 .header-title b{color:var(--text-bright);font-weight:600}
 .header-meta{font-family:var(--font-mono);font-size:.64rem;color:var(--text-muted);display:flex;gap:18px}
+.header-nav{display:flex;gap:6px;align-items:center}
+.header-link{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);text-decoration:none;
+  padding:4px 10px;border-radius:4px;border:1px solid transparent;transition:all .15s;letter-spacing:.04em}
+.header-link:hover{color:var(--text-dim);background:var(--bg-hover);border-color:var(--border)}
+.header-link.active{color:var(--accent);background:var(--accent-dim);border-color:rgba(56,189,248,.2)}
 
 .seq-wrap{position:sticky;top:52px;z-index:90;background:var(--bg-surface);border-bottom:1px solid var(--border);padding:10px 32px 12px}
 .seq-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
@@ -617,11 +622,32 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflo
 .tr-hint{font-family:var(--font-serif);font-size:.66rem;color:var(--text-dim);grid-column:2/5;padding-left:8px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* SYNERGY */
-.synergy-section{margin-top:40px;opacity:0;animation:fadeUp .5s .2s ease forwards}
-.syn-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px 28px}
-.syn-narr{font-family:var(--font-serif);font-size:.88rem;line-height:1.7;color:var(--text);margin-bottom:16px}
-.syn-narr em{color:var(--accent);font-style:normal}
+/* SPECTRAL PANEL */
+.spectral-section{margin-top:40px;opacity:0;animation:fadeUp .5s .2s ease forwards}
+.spectral-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px 28px;overflow:hidden}
+.spectral-tabs{display:flex;gap:2px;margin-bottom:18px;background:var(--bg);border-radius:6px;padding:2px;border:1px solid var(--border)}
+.spectral-tab{flex:1;font-family:var(--font-mono);font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;
+  padding:7px 14px;border-radius:4px;cursor:pointer;color:var(--text-muted);background:transparent;
+  border:none;transition:all .15s;text-align:center;white-space:nowrap}
+.spectral-tab:hover{color:var(--text-dim);background:var(--bg-hover)}
+.spectral-tab.active{color:var(--accent);background:var(--accent-dim);box-shadow:0 0 12px rgba(56,189,248,.06)}
+.spectral-pane{display:none}
+.spectral-pane.active{display:block}
+.spectral-narr{font-family:var(--font-serif);font-size:.82rem;line-height:1.65;color:var(--text-dim);margin-bottom:14px}
+.spectral-narr em{color:var(--accent);font-style:normal;font-weight:500}
+.spectral-legend{display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:.54rem;color:var(--text-muted)}
+.spectral-legend-item{display:flex;align-items:center;gap:5px}
+.spectral-legend-dot{width:8px;height:3px;border-radius:1px;flex-shrink:0}
+.spectral-chart-wrap{position:relative}
+.spectral-tooltip{position:fixed;pointer-events:none;display:none;z-index:200;
+  background:var(--bg-card);border:1px solid var(--border-hi);border-radius:6px;padding:8px 12px;
+  font-family:var(--font-mono);font-size:.62rem;color:var(--text);box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.spectral-tooltip .st-freq{color:var(--accent);font-weight:600;margin-bottom:3px}
+.spectral-tooltip .st-row{display:flex;justify-content:space-between;gap:12px;line-height:1.6}
+.spectral-tooltip .st-label{color:var(--text-dim)}
+.spectral-tooltip .st-val{font-weight:500}
+.spectral-tooltip .st-pos{color:var(--writer)}
+.spectral-tooltip .st-neg{color:var(--eraser)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 .empty{text-align:center;padding:120px 0;font-family:var(--font-serif);font-size:1.05rem;color:var(--text-dim)}
@@ -632,7 +658,7 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflo
 /* INTERACTIVE INLINE REFERENCES */
 .layer-ref{cursor:pointer;border-bottom:1px dotted var(--text-muted);transition:border-color .15s}
 .layer-ref:hover{border-bottom-color:var(--accent)}
-.residue-ref{cursor:pointer;border-bottom:1px dotted var(--text-muted);transition:border-color .15s}
+.residue-ref{cursor:help;border-bottom:1px dotted var(--text-muted);transition:border-color .15s}
 .residue-ref:hover{border-bottom-color:var(--accent)}
 .feature-ref{cursor:help;border-bottom:1px dotted var(--text-muted);transition:border-color .15s}
 .feature-ref:hover{border-bottom-color:var(--text-dim)}
@@ -660,6 +686,13 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflo
 #feature-tip .ft-summary{font-family:var(--font-sans);font-size:.72rem;color:var(--text);line-height:1.5}
 #feature-tip .ft-stats{font-family:var(--font-mono);font-size:.6rem;color:var(--text-dim);margin-bottom:3px}
 #feature-tip .ft-aa{font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);line-height:1.6}
+#residue-tip{display:none;position:fixed;z-index:200;padding:8px 12px;max-width:220px;
+  background:var(--bg-card);border:1px solid var(--border-hi);border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none}
+#residue-tip .rt-title{font-family:var(--font-mono);font-size:.64rem;color:var(--text-bright);font-weight:600;margin-bottom:3px}
+#residue-tip .rt-name{font-family:var(--font-sans);font-size:.72rem;color:var(--text);margin-bottom:3px}
+#residue-tip .rt-detail{font-family:var(--font-mono);font-size:.56rem;color:var(--text-dim);line-height:1.5}
+#residue-tip .rt-tag{display:inline-block;font-size:.52rem;padding:1px 5px;border-radius:3px;margin-right:3px}
 </style>
 </head>
 <body>
@@ -667,6 +700,10 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflo
 <header class="header">
     <div class="header-title">ESM-2 <b>Mechanistic Explorer</b></div>
     <div class="header-meta"><span>33 layers · 20 heads</span><span>650M params</span><span id="h-protein"></span></div>
+    <nav class="header-nav">
+        <a class="header-link active" href="index.html">Explorer</a>
+        <a class="header-link" href="methods.html">Methods</a>
+    </nav>
 </header>
 <div class="seq-wrap">
     <div class="seq-header">
@@ -1249,11 +1286,11 @@ function renderAll(d){
     main.appendChild(expSec);
     raf(()=>buildExplorerHeatmap(d));
 
-    // 5. SYNERGY
-    const synSec=ce('div','synergy-section');
-    synSec.innerHTML=renderSynergy(d);
-    main.appendChild(synSec);
-    raf(()=>drawSynergyChart(d));
+    // 5. SPECTRAL ANALYSIS
+    const specSec=ce('div','spectral-section');
+    specSec.innerHTML=renderSpectral(d);
+    main.appendChild(specSec);
+    raf(()=>initSpectralPanel(d));
 }
 
 function ce(tag,cls){const e=document.createElement(tag);e.className=cls;return e;}
@@ -1286,7 +1323,7 @@ function renderEquation(d){
     const perc=narr.perception_phase||narr.evidence_phase;
     if(perc){
         html+=`<div class="eq-evidence">
-            <div class="eq-evidence-title">Layers 1–23: Perception — What the Model Sees</div>
+            <div class="eq-evidence-title"><span class="layer-ref" data-from="1" data-to="23">Layers\u00a01\u201123</span>: Perception — What the Model Sees</div>
             <div class="eq-evidence-text">${markupPlain(perc.summary)}</div>`;
         // context_character (new) or environment (old)
         const env=perc.context_character||perc.environment;
@@ -1428,25 +1465,20 @@ function renderEquation(d){
 
 // ── Plain text → light markup (bold amino acids, numbers) ──
 function markupPlain(text){
-    if(!text)return'';
-    let s=esc(text);
-    // Layer refs first to avoid partial matches (L10 from L10-23)
-    s=s.replace(/\b(L\d+(?:-(?:L)?\d+)?)\b/g,'<em>$1</em>');
-    // Feature/neuron refs: F18:5372 (layer-qualified) or F5372 (legacy). Interactive, same as markupStory.
-    s=s.replace(/\b([FN])(?:(\d+):)?(\d+)\b/g,function(_,prefix,layer,id){
-        const layerAttr=layer?` data-layer="${layer}"`:'';
-        return`<span class="feature-ref" data-prefix="${prefix}"${layerAttr} data-fid="${id}"><strong>${prefix}${layer?layer+':':''}${id}</strong></span>`;
-    });
-    // AA+position refs (skip F, L, N — already handled)
-    s=s.replace(/\b([A-EG-KMO-Z])(\d+)\b/g,'<em>$1$2</em>');
-    s=s.replace(/(\d+\.?\d*%)/g,'<em>$1</em>');
-    return s;
+    return markupStory(text);
 }
 
 // ── Story markup — interactive layer refs, residue refs, toned-down percentages ──
 function markupStory(text){
     if(!text)return'';
     let s=esc(text);
+    // Spelled-out layer references: "layer 24", "layers 10–17", "Layers 24-30"
+    s=s.replace(/\b([Ll]ayers?)\s+(\d+)(?:[\u2013\u2011\-](\d+))?\b/g,function(_,word,from,to){
+        if(to!==undefined){
+            return`<span class="layer-ref" data-from="${from}" data-to="${to}">${word}\u00a0${from}\u2011${to}</span>`;
+        }
+        return`<span class="layer-ref" data-from="${from}" data-to="${from}">${word}\u00a0${from}</span>`;
+    });
     // Interactive layer references: L30, L27-30 → hoverable spans with dash unstyled
     s=s.replace(/\b(L)(\d+)(?:-(L)?(\d+))?\b/g,function(_,_p,from,_p2,to){
         if(to!==undefined){
@@ -1466,6 +1498,22 @@ function markupStory(text){
     // Percentages: toned down to bright white instead of accent blue
     s=s.replace(/(\d+\.?\d*%)/g,'<span class="pct-ref">$1</span>');
     return s;
+}
+
+// ── Post-process existing HTML to add interactive layer refs (for ch*Story, velocity insights) ──
+function linkifyLayers(html){
+    if(!html)return html;
+    var parts=html.split(/(<[^>]+>)/);
+    for(var i=0;i<parts.length;i++){
+        if(parts[i].charAt(0)==='<')continue;
+        parts[i]=parts[i].replace(/\b([Ll]ayers?)\s+(\d+)([\u2013\u2011\-])(\d+)\b/g,function(_,word,from,sep,to){
+            return'<span class="layer-ref" data-from="'+from+'" data-to="'+to+'">'+word+'\u00a0'+from+'\u2011'+to+'</span>';
+        });
+        parts[i]=parts[i].replace(/\b([Ll]ayer)\s+(\d+)\b/g,function(_,word,num){
+            return'<span class="layer-ref" data-from="'+num+'" data-to="'+num+'">'+word+'\u00a0'+num+'</span>';
+        });
+    }
+    return parts.join('');
 }
 
 function esc(t){
@@ -2120,7 +2168,7 @@ function renderExplorer(d){
     html+=`<div class="explorer-card">`;
     // Controls
     html+=`<div class="explorer-controls">`;
-    html+=`<span style="font-family:var(--font-mono);font-size:.48rem;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;margin-right:4px">Attention Heads</span>`;
+    html+=`<span style="font-family:var(--font-mono);font-size:.48rem;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;margin-right:4px">Layers</span>`;
     EXPLORER_MODES.forEach(m=>{
         // Skip modes that require data we don't have
         if(m.requiresData && !d[m.requiresData]) return;
@@ -2839,7 +2887,7 @@ function toggleChaptersSection(){
 function buildChapterBody(d,ci){
     const ch=CHAPTERS[ci];
     const sae=d.sae_features?.[ch.key];
-    let html=`<div class="ch-narr">${ch.storyFn(d)}</div>`;
+    let html=`<div class="ch-narr">${linkifyLayers(ch.storyFn(d))}</div>`;
 
     if(!sae)return html+'<div style="color:var(--text-muted);font-style:italic">No SAE data at this layer.</div>';
 
@@ -3251,7 +3299,7 @@ function renderVelocityInsight(d,ch,writers,erasers){
     }
 
     if(!msg)return'';
-    return`<div class="velocity-insight"><div class="velocity-insight-text">${msg}</div></div>`;
+    return`<div class="velocity-insight"><div class="velocity-insight-text">${linkifyLayers(msg)}</div></div>`;
 }
 
 function toggleTransition(fromL,toL,el){
@@ -3293,55 +3341,346 @@ function drawMiniVel(id,val,velMax,posCol,negCol){
     c.appendChild(svg);
 }
 
-// ── SYNERGY ──
-function renderSynergy(d){
-    const cos=d.velocity.attn_mlp_cosine;if(!cos)return'';
-    let nOpp=0,nCoop=0;
-    for(let i=0;i<33;i++){
-        const active=Math.abs(d.velocity.attention[i])>.15||Math.abs(d.velocity.mlp[i])>.15;
-        if(!active)continue;
-        if(cos[i]<-.3)nOpp++;if(cos[i]>.3)nCoop++;
-    }
-    let narr=`Across 33 layers, attention and MLP don't just add up — they <em>interact</em>. `;
-    if(nOpp>3)narr+=`They actively <em>oppose</em> each other at ${nOpp} layers, using tension to refine the prediction. `;
-    if(nCoop>2)narr+=`They <em>cooperate</em> at ${nCoop} layers. `;
-    narr+=`Green = cooperation. Red = opposition.`;
-    return`<div class="sec-label">Attention ↔ MLP Dynamics</div>
-        <div class="syn-card"><div class="syn-narr">${narr}</div><div id="syn-chart"></div></div>`;
+// ── SPECTRAL ANALYSIS PANEL ──
+function renderSpectral(d){
+    const spec=d.spectral;
+    if(!spec)return`<div class="sec-label">Spectral Analysis</div><div class="spectral-card"><div class="spectral-narr">No spectral data available for this position.</div></div>`;
+
+    // Compute summary stats for narratives
+    const nFreq=spec.n_frequencies||spec.total_power.length;
+    const totalPow=spec.total_power.reduce((a,b)=>a+b,0);
+    const dcPow=spec.total_power[0];
+    const dcPct=(dcPow/totalPow*100).toFixed(0);
+    const ansProj=spec.answer_projection;
+    const dcProj=ansProj[0];
+    const topOppIdx=ansProj.slice(1).reduce((best,v,i)=>v<ansProj[best]?i+1:best,1);
+    const topBoostIdx=ansProj.slice(1).reduce((best,v,i)=>v>ansProj[best]?i+1:best,1);
+
+    // Butterfly narrative
+    const attnDC=spec.attn_power[0], mlpDC=spec.mlp_power[0];
+    const attnTotal=spec.attn_power.reduce((a,b)=>a+b,0), mlpTotal=spec.mlp_power.reduce((a,b)=>a+b,0);
+    const attnHFShare=(1-spec.attn_power.slice(0,3).reduce((a,b)=>a+b,0)/attnTotal)*100;
+    const mlpHFShare=(1-spec.mlp_power.slice(0,3).reduce((a,b)=>a+b,0)/mlpTotal)*100;
+
+    let butterflyNarr=`Attention and MLP operate on <em>different frequency scales</em>. `;
+    // if(attnHFShare<mlpHFShare)butterflyNarr+=`Attention concentrates in low frequencies (${(100-attnHFShare).toFixed(0)}% below mode 2), while MLP spreads more energy into higher frequencies (${mlpHFShare.toFixed(0)}% above mode 2). `;
+    // else butterflyNarr+=`Both sub-layers show substantial high-frequency content — MLP at ${mlpHFShare.toFixed(0)}% and attention at ${attnHFShare.toFixed(0)}% above mode 2. `;
+    butterflyNarr+=`Color encodes answer projection: <em>green</em> = pushes toward correct prediction, <em>red</em> = pushes away.`;
+
+    let powerNarr=`The DC component (frequency 0) carries <em>${dcPct}%</em> of total spectral power `;
+    if(dcProj>0)powerNarr+=`and projects <em>strongly toward</em> the correct answer (+${dcProj.toFixed(1)}). `;
+    else powerNarr+=`but projects <em>against</em> the correct answer (${dcProj.toFixed(1)}). `;
+    if(Math.abs(ansProj[topOppIdx])>5)powerNarr+=`Frequency ${topOppIdx} is the strongest opposing mode (${ansProj[topOppIdx].toFixed(1)}). `;
+    if(topBoostIdx!==0&&ansProj[topBoostIdx]>5)powerNarr+=`Frequency ${topBoostIdx} provides additional boost (+${ansProj[topBoostIdx].toFixed(1)}). `;
+
+    let html=`<div class="sec-label">Spectral Analysis</div>`;
+    html+=`<div class="spectral-card">`;
+    html+=`<div class="spectral-tabs">`;
+    html+=`<button class="spectral-tab active" data-pane="butterfly">Attn ↔ MLP Fingerprint</button>`;
+    html+=`<button class="spectral-tab" data-pane="power">Power + Answer Projection</button>`;
+    html+=`</div>`;
+
+    // Pane 1: Butterfly
+    html+=`<div class="spectral-pane active" id="sp-butterfly">`;
+    html+=`<div class="spectral-narr">${butterflyNarr}</div>`;
+    html+=`<div class="spectral-legend">`;
+    // html+=`<span class="spectral-legend-item"><span class="spectral-legend-dot" style="background:var(--accent)"></span>Attention (↑)</span>`;
+    // html+=`<span class="spectral-legend-item"><span class="spectral-legend-dot" style="background:var(--mlp-color)"></span>MLP (↓)</span>`;
+    html+=`<span class="spectral-legend-item"><span class="spectral-legend-dot" style="background:var(--writer)"></span>+proj</span>`;
+    html+=`<span class="spectral-legend-item"><span class="spectral-legend-dot" style="background:var(--eraser)"></span>−proj</span>`;
+    html+=`</div>`;
+    html+=`<div class="spectral-chart-wrap" id="sp-butterfly-chart"></div>`;
+    html+=`</div>`;
+
+    // Pane 2: Power + Projection
+    html+=`<div class="spectral-pane" id="sp-power">`;
+    html+=`<div class="spectral-narr">${powerNarr}</div>`;
+    html+=`<div class="spectral-legend">`;
+    html+=`<span class="spectral-legend-item"><span class="spectral-legend-dot" style="background:rgba(56,189,248,0.5);height:8px"></span>Total power</span>`;
+    html+=`<span class="spectral-legend-item"><span class="spectral-legend-dot" style="background:var(--writer)"></span>Answer proj (+)</span>`;
+    html+=`<span class="spectral-legend-item"><span class="spectral-legend-dot" style="background:var(--eraser)"></span>Answer proj (−)</span>`;
+    html+=`</div>`;
+    html+=`<div class="spectral-chart-wrap" id="sp-power-chart"></div>`;
+    html+=`</div>`;
+
+    html+=`</div>`;
+    return html;
 }
 
-function drawSynergyChart(d){
-    const c=document.getElementById('syn-chart');
-    if(!c||!d.velocity.attn_mlp_cosine)return;
-    const cos=d.velocity.attn_mlp_cosine;
-    const margin={top:16,right:20,bottom:28,left:44};
-    const W=c.clientWidth||860,H=130;
-    const w=W-margin.left-margin.right,h=H-margin.top-margin.bottom;
-    const svg=d3.select(c).append('svg').attr('width',W).attr('height',H);
-    const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
-    const x=d3.scaleLinear().domain([0,32]).range([0,w]);
-    const y=d3.scaleLinear().domain([-1,1]).range([h,0]);
-    g.append('line').attr('x1',0).attr('x2',w).attr('y1',y(0)).attr('y2',y(0)).attr('stroke','rgba(56,189,248,0.2)');
-    [-.3,.3].forEach(v=>{g.append('line').attr('x1',0).attr('x2',w).attr('y1',y(v)).attr('y2',y(v))
-        .attr('stroke','rgba(148,163,184,0.08)').attr('stroke-dasharray','3,4');});
-    g.append('text').attr('x',-8).attr('y',y(.8)+3).attr('text-anchor','end').attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(45,212,160,0.4)').text('cooperate');
-    g.append('text').attr('x',-8).attr('y',y(-.8)+3).attr('text-anchor','end').attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(248,113,113,0.4)').text('oppose');
-    const area=d3.area().x((_,i)=>x(i)).y0(y(0)).y1(v=>y(v)).curve(d3.curveMonotoneX);
-    g.append('path').datum(cos.map(v=>Math.max(v,0))).attr('d',area).attr('fill','rgba(45,212,160,0.08)');
-    g.append('path').datum(cos.map(v=>Math.min(v,0))).attr('d',area).attr('fill','rgba(248,113,113,0.08)');
-    const line=d3.line().x((_,i)=>x(i)).y(v=>y(v)).curve(d3.curveMonotoneX);
-    g.append('path').datum(cos).attr('d',line).attr('fill','none').attr('stroke','rgba(200,208,224,0.35)').attr('stroke-width',1.5);
-    cos.forEach((v,i)=>{
-        const act=Math.abs(d.velocity.attention[i])>.15||Math.abs(d.velocity.mlp[i])>.15;
-        const col=!act?'rgba(148,163,184,0.12)':v>.3?'rgba(45,212,160,0.65)':v<-.3?'rgba(248,113,113,0.65)':'rgba(148,163,184,0.25)';
-        g.append('circle').attr('cx',x(i)).attr('cy',y(v)).attr('r',act?3.5:2).attr('fill',col);});
-    // SAE layer markers
-    [0,8,17,23,29,32].forEach(l=>{
-        g.append('line').attr('x1',x(l)).attr('x2',x(l)).attr('y1',0).attr('y2',h)
-            .attr('stroke','rgba(56,189,248,0.08)').attr('stroke-dasharray','2,3');
+function initSpectralPanel(d){
+    if(!d.spectral)return;
+
+    // Tab switching
+    document.querySelectorAll('.spectral-tab').forEach(tab=>{
+        tab.addEventListener('click',()=>{
+            document.querySelectorAll('.spectral-tab').forEach(t=>t.classList.remove('active'));
+            document.querySelectorAll('.spectral-pane').forEach(p=>p.classList.remove('active'));
+            tab.classList.add('active');
+            const pane=document.getElementById('sp-'+tab.dataset.pane);
+            if(pane)pane.classList.add('active');
+            // Draw chart on first show if needed
+            if(tab.dataset.pane==='power'&&!pane._drawn){drawPowerChart(d);pane._drawn=true;}
+            if(tab.dataset.pane==='butterfly'&&!pane._drawn){drawButterflyChart(d);pane._drawn=true;}
+        });
     });
-    for(let i=0;i<33;i+=4){g.append('text').attr('x',x(i)).attr('y',h+14).attr('text-anchor','middle')
-        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(92,106,132,0.35)').text('L'+(i+1));}
+
+    // Draw initial chart
+    drawButterflyChart(d);
+    document.getElementById('sp-butterfly')._drawn=true;
+}
+
+// Shared tooltip
+function getSpectralTooltip(){
+    let tip=document.getElementById('spectral-tip');
+    if(!tip){tip=document.createElement('div');tip.id='spectral-tip';tip.className='spectral-tooltip';document.body.appendChild(tip);}
+    return tip;
+}
+
+function drawButterflyChart(d){
+    const container=document.getElementById('sp-butterfly-chart');
+    if(!container)return;
+    container.innerHTML='';
+    const spec=d.spectral;
+    const nFreq=spec.n_frequencies||spec.total_power.length;
+
+    const margin={top:20,right:24,bottom:32,left:72};
+    const W=container.clientWidth||860,H=220;
+    const w=W-margin.left-margin.right,h=H-margin.top-margin.bottom;
+
+    const svg=d3.select(container).append('svg').attr('width',W).attr('height',H);
+    const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+
+    const maxAttn=d3.max(spec.attn_power);
+    const maxMlp=d3.max(spec.mlp_power);
+    const maxPow=Math.max(maxAttn,maxMlp)*1.08;
+
+    const x=d3.scaleBand().domain(d3.range(nFreq)).range([0,w]).padding(0.18);
+    const yUp=d3.scaleLinear().domain([0,maxPow]).range([h/2,0]);
+    const yDown=d3.scaleLinear().domain([0,maxPow]).range([h/2,h]);
+
+    // Zero line
+    g.append('line').attr('x1',0).attr('x2',w).attr('y1',h/2).attr('y2',h/2)
+        .attr('stroke','rgba(56,189,248,0.15)').attr('stroke-width',1);
+
+    // Gridlines
+    const attnTicks=yUp.ticks(3).filter(t=>t>0);
+    attnTicks.forEach(t=>{
+        g.append('line').attr('x1',0).attr('x2',w).attr('y1',yUp(t)).attr('y2',yUp(t))
+            .attr('stroke','rgba(148,163,184,0.05)').attr('stroke-dasharray','2,4');
+    });
+    attnTicks.forEach(t=>{
+        g.append('line').attr('x1',0).attr('x2',w).attr('y1',yDown(t)).attr('y2',yDown(t))
+            .attr('stroke','rgba(148,163,184,0.05)').attr('stroke-dasharray','2,4');
+    });
+
+    // Color function based on answer projection
+    function projColor(val,alpha){
+        if(val>0)return`rgba(45,212,160,${alpha})`;
+        if(val<0)return`rgba(248,113,113,${alpha})`;
+        return`rgba(148,163,184,${alpha})`;
+    }
+
+    // Attention bars (upward)
+    g.selectAll('.attn-bar').data(spec.attn_power).enter().append('rect')
+        .attr('class','attn-bar')
+        .attr('x',(_,i)=>x(i))
+        .attr('y',v=>yUp(v))
+        .attr('width',x.bandwidth())
+        .attr('height',v=>h/2-yUp(v))
+        .attr('rx',1.5)
+        .attr('fill',(_,i)=>projColor(spec.attn_answer_projection[i],0.55))
+        .attr('stroke',(_,i)=>projColor(spec.attn_answer_projection[i],0.3))
+        .attr('stroke-width',0.5);
+
+    // MLP bars (downward)
+    g.selectAll('.mlp-bar').data(spec.mlp_power).enter().append('rect')
+        .attr('class','mlp-bar')
+        .attr('x',(_,i)=>x(i))
+        .attr('y',h/2)
+        .attr('width',x.bandwidth())
+        .attr('height',v=>yDown(v)-h/2)
+        .attr('rx',1.5)
+        .attr('fill',(_,i)=>projColor(spec.mlp_answer_projection[i],0.45))
+        .attr('stroke',(_,i)=>projColor(spec.mlp_answer_projection[i],0.25))
+        .attr('stroke-width',0.5);
+
+    // Axis labels
+    g.append('text').attr('x',-38).attr('y',h/4).attr('text-anchor','end')
+        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(56,189,248,0.4)').text('Attn');
+    g.append('text').attr('x',-38).attr('y',h*3/4).attr('text-anchor','end')
+        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(192,132,252,0.4)').text('MLP');
+
+    // Y-axis ticks
+    attnTicks.forEach(t=>{
+        g.append('text').attr('x',-14).attr('y',yUp(t)+3).attr('text-anchor','end')
+            .attr('font-family','var(--font-mono)').attr('font-size','6.5').attr('fill','rgba(92,106,132,0.35)').text(t>=1000?(t/1000).toFixed(0)+'k':t.toFixed(0));
+        g.append('text').attr('x',-14).attr('y',yDown(t)+3).attr('text-anchor','end')
+            .attr('font-family','var(--font-mono)').attr('font-size','6.5').attr('fill','rgba(92,106,132,0.35)').text(t>=1000?(t/1000).toFixed(0)+'k':t.toFixed(0));
+    });
+
+    // X-axis: frequency labels
+    for(let i=0;i<nFreq;i++){
+        if(nFreq<=18||i%2===0||i===nFreq-1){
+            g.append('text').attr('x',x(i)+x.bandwidth()/2).attr('y',h+14).attr('text-anchor','middle')
+                .attr('font-family','var(--font-mono)').attr('font-size','6.5').attr('fill','rgba(92,106,132,0.35)').text(i);
+        }
+    }
+    g.append('text').attr('x',w/2).attr('y',h+26).attr('text-anchor','middle')
+        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(92,106,132,0.3)').text('frequency index');
+
+    // Hover overlay
+    const tip=getSpectralTooltip();
+    const overlay=g.append('g');
+    for(let i=0;i<nFreq;i++){
+        overlay.append('rect')
+            .attr('x',x(i)-x.step()*x.padding()/2)
+            .attr('y',0).attr('width',x.step()).attr('height',h)
+            .attr('fill','transparent').attr('cursor','crosshair')
+            .on('mouseover',function(ev){
+                const ap=spec.attn_answer_projection[i],mp=spec.mlp_answer_projection[i];
+                tip.innerHTML=`<div class="st-freq">Frequency ${i}${i===0?' (DC)':''}</div>`
+                    +`<div class="st-row"><span class="st-label">Attn power</span><span class="st-val">${spec.attn_power[i].toFixed(1)}</span></div>`
+                    +`<div class="st-row"><span class="st-label">MLP power</span><span class="st-val">${spec.mlp_power[i].toFixed(1)}</span></div>`
+                    +`<div class="st-row"><span class="st-label">Attn → answer</span><span class="st-val ${ap>=0?'st-pos':'st-neg'}">${ap>=0?'+':''}${ap.toFixed(1)}</span></div>`
+                    +`<div class="st-row"><span class="st-label">MLP → answer</span><span class="st-val ${mp>=0?'st-pos':'st-neg'}">${mp>=0?'+':''}${mp.toFixed(1)}</span></div>`;
+                tip.style.display='block';
+                const r=this.getBoundingClientRect();
+                tip.style.left=Math.max(4,Math.min(r.left+r.width/2-tip.offsetWidth/2,window.innerWidth-tip.offsetWidth-4))+'px';
+                tip.style.top=(r.top-tip.offsetHeight-8)+'px';
+                if(parseFloat(tip.style.top)<4)tip.style.top=(r.bottom+8)+'px';
+            })
+            .on('mouseout',()=>{tip.style.display='none';});
+    }
+}
+
+function drawPowerChart(d){
+    const container=document.getElementById('sp-power-chart');
+    if(!container)return;
+    container.innerHTML='';
+    const spec=d.spectral;
+    const nFreq=spec.n_frequencies||spec.total_power.length;
+
+    const margin={top:20,right:56,bottom:32,left:52};
+    const W=container.clientWidth||860,H=200;
+    const w=W-margin.left-margin.right,h=H-margin.top-margin.bottom;
+
+    const svg=d3.select(container).append('svg').attr('width',W).attr('height',H);
+    const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+
+    const maxPow=d3.max(spec.total_power)*1.05;
+    const maxProj=d3.max(spec.answer_projection.map(Math.abs))*1.15;
+
+    const x=d3.scaleBand().domain(d3.range(nFreq)).range([0,w]).padding(0.15);
+    const yPow=d3.scaleLinear().domain([0,maxPow]).range([h,0]);
+    const yProj=d3.scaleLinear().domain([-maxProj,maxProj]).range([h,0]);
+
+    // Gridlines for power
+    yPow.ticks(4).filter(t=>t>0).forEach(t=>{
+        g.append('line').attr('x1',0).attr('x2',w).attr('y1',yPow(t)).attr('y2',yPow(t))
+            .attr('stroke','rgba(148,163,184,0.05)').attr('stroke-dasharray','2,4');
+    });
+
+    // Zero line for projection
+    g.append('line').attr('x1',0).attr('x2',w).attr('y1',yProj(0)).attr('y2',yProj(0))
+        .attr('stroke','rgba(56,189,248,0.12)').attr('stroke-width',0.5);
+
+    // Power bars
+    g.selectAll('.pow-bar').data(spec.total_power).enter().append('rect')
+        .attr('class','pow-bar')
+        .attr('x',(_,i)=>x(i))
+        .attr('y',v=>yPow(v))
+        .attr('width',x.bandwidth())
+        .attr('height',v=>h-yPow(v))
+        .attr('rx',1.5)
+        .attr('fill','rgba(56,189,248,0.18)')
+        .attr('stroke','rgba(56,189,248,0.12)')
+        .attr('stroke-width',0.5);
+
+    // Answer projection line
+    const projLine=d3.line()
+        .x((_,i)=>x(i)+x.bandwidth()/2)
+        .y(v=>yProj(v))
+        .curve(d3.curveMonotoneX);
+
+    // Filled areas for positive and negative projection
+    const projAreaPos=d3.area()
+        .x((_,i)=>x(i)+x.bandwidth()/2)
+        .y0(yProj(0))
+        .y1(v=>yProj(Math.max(v,0)))
+        .curve(d3.curveMonotoneX);
+    const projAreaNeg=d3.area()
+        .x((_,i)=>x(i)+x.bandwidth()/2)
+        .y0(yProj(0))
+        .y1(v=>yProj(Math.min(v,0)))
+        .curve(d3.curveMonotoneX);
+
+    g.append('path').datum(spec.answer_projection).attr('d',projAreaPos).attr('fill','rgba(45,212,160,0.08)');
+    g.append('path').datum(spec.answer_projection).attr('d',projAreaNeg).attr('fill','rgba(248,113,113,0.08)');
+    g.append('path').datum(spec.answer_projection).attr('d',projLine)
+        .attr('fill','none').attr('stroke','rgba(200,208,224,0.5)').attr('stroke-width',1.5);
+
+    // Projection dots
+    spec.answer_projection.forEach((v,i)=>{
+        const col=v>0?'rgba(45,212,160,0.7)':v<0?'rgba(248,113,113,0.7)':'rgba(148,163,184,0.3)';
+        g.append('circle').attr('cx',x(i)+x.bandwidth()/2).attr('cy',yProj(v)).attr('r',2.5).attr('fill',col);
+    });
+
+    // Left Y-axis (power)
+    yPow.ticks(4).filter(t=>t>0).forEach(t=>{
+        g.append('text').attr('x',-10).attr('y',yPow(t)+3).attr('text-anchor','end')
+            .attr('font-family','var(--font-mono)').attr('font-size','6.5').attr('fill','rgba(56,189,248,0.35)')
+            .text(t>=1000?(t/1000).toFixed(0)+'k':t.toFixed(0));
+    });
+    g.append('text').attr('x',-10).attr('y',-8).attr('text-anchor','end')
+        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(56,189,248,0.3)').text('power');
+
+    // Right Y-axis (projection)
+    const projTicks=yProj.ticks(5);
+    projTicks.forEach(t=>{
+        g.append('text').attr('x',w+10).attr('y',yProj(t)+3).attr('text-anchor','start')
+            .attr('font-family','var(--font-mono)').attr('font-size','6.5')
+            .attr('fill',t>0?'rgba(45,212,160,0.35)':t<0?'rgba(248,113,113,0.35)':'rgba(148,163,184,0.2)')
+            .text((t>0?'+':'')+t.toFixed(0));
+    });
+    g.append('text').attr('x',w+10).attr('y',-8).attr('text-anchor','start')
+        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(148,163,184,0.3)').text('proj');
+
+    // X-axis
+    for(let i=0;i<nFreq;i++){
+        if(nFreq<=18||i%2===0||i===nFreq-1){
+            g.append('text').attr('x',x(i)+x.bandwidth()/2).attr('y',h+14).attr('text-anchor','middle')
+                .attr('font-family','var(--font-mono)').attr('font-size','6.5').attr('fill','rgba(92,106,132,0.35)').text(i);
+        }
+    }
+    g.append('text').attr('x',w/2).attr('y',h+26).attr('text-anchor','middle')
+        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(92,106,132,0.3)').text('frequency index');
+
+    // Hover overlay
+    const tip=getSpectralTooltip();
+    const overlay=g.append('g');
+    for(let i=0;i<nFreq;i++){
+        overlay.append('rect')
+            .attr('x',x(i)-x.step()*x.padding()/2)
+            .attr('y',0).attr('width',x.step()).attr('height',h)
+            .attr('fill','transparent').attr('cursor','crosshair')
+            .on('mouseover',function(ev){
+                const ap=spec.answer_projection[i],aap=spec.attn_answer_projection[i],map=spec.mlp_answer_projection[i];
+                tip.innerHTML=`<div class="st-freq">Frequency ${i}${i===0?' (DC)':''}</div>`
+                    +`<div class="st-row"><span class="st-label">Total power</span><span class="st-val">${spec.total_power[i].toFixed(1)}</span></div>`
+                    +`<div class="st-row"><span class="st-label">Attn power</span><span class="st-val">${spec.attn_power[i].toFixed(1)}</span></div>`
+                    +`<div class="st-row"><span class="st-label">MLP power</span><span class="st-val">${spec.mlp_power[i].toFixed(1)}</span></div>`
+                    +`<hr style="border:none;border-top:1px solid var(--border);margin:4px 0">`
+                    +`<div class="st-row"><span class="st-label">Total → answer</span><span class="st-val ${ap>=0?'st-pos':'st-neg'}">${ap>=0?'+':''}${ap.toFixed(1)}</span></div>`
+                    +`<div class="st-row"><span class="st-label">Attn → answer</span><span class="st-val ${aap>=0?'st-pos':'st-neg'}">${aap>=0?'+':''}${aap.toFixed(1)}</span></div>`
+                    +`<div class="st-row"><span class="st-label">MLP → answer</span><span class="st-val ${map>=0?'st-pos':'st-neg'}">${map>=0?'+':''}${map.toFixed(1)}</span></div>`;
+                tip.style.display='block';
+                const r=this.getBoundingClientRect();
+                tip.style.left=Math.max(4,Math.min(r.left+r.width/2-tip.offsetWidth/2,window.innerWidth-tip.offsetWidth-4))+'px';
+                tip.style.top=(r.top-tip.offsetHeight-8)+'px';
+                if(parseFloat(tip.style.top)<4)tip.style.top=(r.bottom+8)+'px';
+            })
+            .on('mouseout',()=>{tip.style.display='none';});
+    }
 }
 
 // ═══════════════════════════════════════════
@@ -3465,23 +3804,49 @@ async function selectPos(pos){
     });
 })();
 
-// ── Residue reference interactions (hover highlights seq bar, click navigates) ──
+// ── Residue reference interactions (hover highlights seq bar + tooltip) ──
 (function(){
+    const tip=document.createElement('div');tip.id='residue-tip';document.body.appendChild(tip);
     document.addEventListener('mouseover',function(e){
         const ref=e.target.closest('.residue-ref');
         if(!ref)return;
         const pos=parseInt(ref.dataset.pos);
         const el=document.querySelector(`.res[data-pos="${pos}"]`);
         if(el)el.classList.add('narrative-hover');
+        // Build tooltip
+        if(!META||!META.sequence)return;
+        const aa=META.sequence[pos];
+        if(!aa)return;
+        const name=AA_NAMES[aa]||aa;
+        let h=`<div class="rt-title">${aa}${pos+1}</div><div class="rt-name">${name}</div>`;
+        // Relationship to current position
+        if(POS_DATA){
+            const contacts=new Set(POS_DATA.annotations?.structural_contacts||[]);
+            const coevol=new Set(POS_DATA.annotations?.coevolving_positions||[]);
+            const dist=Math.abs(pos-POS_DATA.position);
+            const tags=[];
+            if(contacts.has(pos))tags.push('<span class="rt-tag" style="background:rgba(56,189,248,.15);color:var(--structural)">structural</span>');
+            if(coevol.has(pos))tags.push('<span class="rt-tag" style="background:rgba(168,85,247,.15);color:var(--coevol)">co-evolving</span>');
+            if(dist<=5&&dist>0)tags.push('<span class="rt-tag" style="background:rgba(45,212,160,.12);color:var(--local)">local</span>');
+            if(tags.length)h+=`<div style="margin:3px 0">${tags.join('')}</div>`;
+            // Importance
+            const imp=POS_DATA.source_importance;
+            if(imp&&imp.total&&imp.total[pos]!==undefined){
+                const v=imp.total[pos];
+                if(v>0.01)h+=`<div class="rt-detail">Info flow to prediction: ${v.toFixed(2)}</div>`;
+            }
+        }
+        tip.innerHTML=h;tip.style.display='block';
+        const rect=ref.getBoundingClientRect();
+        tip.style.left=Math.max(4,Math.min(rect.left,window.innerWidth-tip.offsetWidth-4))+'px';
+        tip.style.top=(rect.top-tip.offsetHeight-8)+'px';
+        if(parseFloat(tip.style.top)<4)tip.style.top=(rect.bottom+8)+'px';
     });
     document.addEventListener('mouseout',function(e){
-        if(e.target.closest('.residue-ref'))
+        if(e.target.closest('.residue-ref')){
             document.querySelectorAll('.res.narrative-hover').forEach(el=>el.classList.remove('narrative-hover'));
-    });
-    document.addEventListener('click',function(e){
-        const ref=e.target.closest('.residue-ref');
-        if(!ref)return;
-        selectPos(parseInt(ref.dataset.pos));
+            tip.style.display='none';
+        }
     });
 })();
 
