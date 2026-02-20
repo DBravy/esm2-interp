@@ -74,8 +74,15 @@ body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflo
 
 .main{max-width:1020px;margin:0 auto;padding:40px 32px 140px}
 .sec-label{font-family:var(--font-mono);font-size:.56rem;color:var(--text-muted);letter-spacing:.14em;
-  text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;transition:color .15s}
+.sec-label:hover{color:var(--text-dim)}
+.sec-label::before{content:'\25BE';font-size:.7rem;transition:transform .25s ease;display:inline-block;color:var(--text-dim)}
 .sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.collapsed .sec-label{margin-bottom:0}
+.collapsed .sec-label::before{transform:rotate(-90deg)}
+.sec-body{overflow:hidden;transition:grid-template-rows .3s ease;display:grid;grid-template-rows:1fr}
+.collapsed .sec-body{grid-template-rows:0fr}
+.sec-body-inner{overflow:hidden}
 
 /* PREDICTION */
 .pred{margin-bottom:44px;opacity:0;animation:fadeUp .5s .05s ease forwards}
@@ -1268,34 +1275,48 @@ function renderAll(d){
     const predSec=ce('div','pred');
     predSec.innerHTML=`<div class="sec-label">Prediction</div>`+renderPredCard(d);
     main.appendChild(predSec);
+    makeCollapsible(predSec);
     raf(()=>raf(()=>predSec.querySelectorAll('.pb-fill').forEach(f=>f.style.width=f.dataset.w)));
 
     // 2. THE EQUATION
     const eqSec=ce('div','equation-section');
     eqSec.innerHTML=renderEquation(d);
     main.appendChild(eqSec);
+    makeCollapsible(eqSec);
     raf(()=>drawRaceChart(d));
 
     // 3. SOURCES
     const srcSec=ce('div','sources');
     srcSec.innerHTML=renderSources(d);
     main.appendChild(srcSec);
+    makeCollapsible(srcSec);
 
     // 4. FULL LAYER EXPLORER (replaces old chapters)
     const expSec=ce('div','explorer');
     expSec.innerHTML=renderExplorer(d);
     main.appendChild(expSec);
+    makeCollapsible(expSec);
     raf(()=>buildExplorerHeatmap(d));
 
     // 5. SPECTRAL ANALYSIS
     const specSec=ce('div','spectral-section');
     specSec.innerHTML=renderSpectral(d);
     main.appendChild(specSec);
+    makeCollapsible(specSec);
     raf(()=>initSpectralPanel(d));
 }
 
 function ce(tag,cls){const e=document.createElement(tag);e.className=cls;return e;}
 function raf(fn){requestAnimationFrame(()=>requestAnimationFrame(fn));}
+function makeCollapsible(secEl){
+    const label=secEl.querySelector('.sec-label');
+    if(!label)return;
+    const body=document.createElement('div');body.className='sec-body';
+    const inner=document.createElement('div');inner.className='sec-body-inner';
+    while(label.nextSibling)inner.appendChild(label.nextSibling);
+    body.appendChild(inner);secEl.appendChild(body);
+    label.addEventListener('click',()=>secEl.classList.toggle('collapsed'));
+}
 
 // ═══════════════════════════════════════════
 // THE EQUATION
