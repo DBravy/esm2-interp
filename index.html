@@ -1,0 +1,3568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESM-2 — How a Protein Language Model Thinks</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg:#08090e;--bg-surface:#0d0f16;--bg-card:#11141c;--bg-expand:#151923;--bg-hover:#1a1f2c;
+    --border:#1a2030;--border-hi:#283050;
+    --text:#c0c8da;--text-dim:#58677e;--text-bright:#e8ecf4;--text-muted:#3a4860;
+    --accent:#38bdf8;--accent-dim:rgba(56,189,248,.08);
+    --writer:#2dd4a0;--writer-dim:rgba(45,212,160,.1);
+    --eraser:#f87171;--eraser-dim:rgba(248,113,113,.1);
+    --structural:#22d3ee;--structural-dim:rgba(34,211,238,.08);
+    --coevol:#34d399;--coevol-dim:rgba(52,211,153,.08);
+    --local:#fbbf24;--local-dim:rgba(251,191,36,.08);
+    --other:#94a3b8;--other-dim:rgba(148,163,184,.08);
+    --mlp-color:#c084fc;--mlp-dim:rgba(192,132,252,.08);
+    --ch1:#60a5fa;--ch2:#22d3ee;--ch3:#34d399;--ch4:#fbbf24;--ch5:#f87171;--ch6:#c084fc;
+    --font-mono:'JetBrains Mono',monospace;
+    --font-serif:'Source Serif 4',Georgia,serif;
+    --font-sans:'Instrument Sans',system-ui,sans-serif;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:18px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-sans);background:var(--bg);color:var(--text);overflow-x:hidden;min-height:100vh}
+::selection{background:var(--accent);color:var(--bg)}
+
+.header{display:flex;align-items:center;justify-content:space-between;padding:0 32px;height:52px;
+  background:var(--bg-surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.header-title{font-family:var(--font-mono);font-size:.78rem;color:var(--text-dim);font-weight:300;letter-spacing:.06em}
+.header-title b{color:var(--text-bright);font-weight:600}
+.header-meta{font-family:var(--font-mono);font-size:.64rem;color:var(--text-muted);display:flex;gap:18px}
+
+.seq-wrap{position:sticky;top:52px;z-index:90;background:var(--bg-surface);border-bottom:1px solid var(--border);padding:10px 32px 12px}
+.seq-header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px}
+.seq-label{font-family:var(--font-mono);font-size:.56rem;color:var(--text-muted);letter-spacing:.14em;text-transform:uppercase}
+.seq-bar-legend{display:none;gap:10px;font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted)}
+.seq-bar-legend.visible{display:flex}
+.sbl-item{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.sbl-dot{width:6px;height:6px;border-radius:2px;flex-shrink:0}
+.proj-legend{display:flex;gap:10px;font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);align-items:center}
+.proj-legend .pl-plus{color:var(--writer);font-weight:600}
+.proj-legend .pl-minus{color:var(--eraser);font-weight:600}
+.seq-bar{display:flex;gap:1px;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;padding-bottom:4px;
+  width:calc(100vw - 64px)}
+.seq-bar::-webkit-scrollbar{height:3px}
+.seq-bar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.res{font-family:var(--font-mono);font-size:.64rem;width:22px;height:34px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;border-radius:3px;cursor:pointer;flex-shrink:0;
+  background:var(--bg-card);color:var(--text-muted);border:1px solid transparent;transition:all .15s;position:relative}
+.res:hover{color:var(--text);background:var(--bg-hover);border-color:var(--border)}
+.res.sel{background:rgba(56,189,248,.12);color:var(--accent);border-color:var(--accent);font-weight:600;box-shadow:0 0 16px rgba(56,189,248,.12)}
+.res .n{font-size:.38rem;line-height:1;color:inherit;opacity:.45}
+.res .imp{position:absolute;bottom:0;left:1px;right:1px;height:3px;border-radius:0 0 2px 2px}
+.res.src-struct{border-color:var(--structural)!important;background:var(--structural-dim)!important;color:var(--structural)!important}
+.res.src-struct:hover{background:rgba(34,211,238,.2)!important;box-shadow:0 0 8px rgba(34,211,238,.25)}
+.res.src-coevol{border-color:var(--coevol)!important;background:var(--coevol-dim)!important;color:var(--coevol)!important}
+.res.src-coevol:hover{background:rgba(52,211,153,.2)!important;box-shadow:0 0 8px rgba(52,211,153,.25)}
+.res.src-local{border-color:var(--local)!important;background:var(--local-dim)!important;color:var(--local)!important}
+.res.src-local:hover{background:rgba(251,191,36,.2)!important;box-shadow:0 0 8px rgba(251,191,36,.25)}
+.res.src-generic{border-color:var(--other)!important;background:var(--other-dim)!important;color:var(--other)!important}
+.res.src-generic:hover{background:rgba(148,163,184,.18)!important;box-shadow:0 0 8px rgba(148,163,184,.2)}
+
+.main{max-width:1020px;margin:0 auto;padding:40px 32px 140px}
+.sec-label{font-family:var(--font-mono);font-size:.56rem;color:var(--text-muted);letter-spacing:.14em;
+  text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.sec-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* PREDICTION */
+.pred{margin-bottom:44px;opacity:0;animation:fadeUp .5s .05s ease forwards}
+.pred-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:32px 36px;display:flex;gap:36px;align-items:flex-start}
+.pred-left{text-align:center;min-width:110px;padding-top:4px}
+.pred-aa{font-family:var(--font-mono);font-size:4rem;font-weight:700;line-height:1}
+.pred-prob{font-family:var(--font-mono);font-size:1.1rem;color:var(--accent);font-weight:600;margin-top:4px}
+.pred-name{font-family:var(--font-serif);font-size:.78rem;color:var(--text-dim);margin-top:2px;font-style:italic}
+.pred-right{flex:1}
+.pred-story{font-family:var(--font-serif);font-size:1rem;line-height:1.75;color:var(--text);margin-bottom:20px}
+.pred-story em{color:var(--accent);font-style:normal;font-weight:500}
+.pred-story strong{color:var(--text-bright);font-weight:500}
+.pred-bars{display:flex;flex-direction:column;gap:5px}
+.pb-row{display:flex;align-items:center;gap:8px}
+.pb-aa{font-family:var(--font-mono);font-size:.78rem;width:16px;text-align:right;font-weight:600}
+.pb-track{flex:1;height:14px;background:var(--bg);border-radius:3px;overflow:hidden}
+.pb-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.16,1,.3,1)}
+.pb-fill.top{background:linear-gradient(90deg,var(--accent),#60a5fa)}
+.pb-fill.alt{background:var(--border)}
+.pb-val{font-family:var(--font-mono);font-size:.7rem;color:var(--text-dim);width:52px;text-align:right}
+
+/* SOURCES */
+.sources{margin-bottom:44px;opacity:0;animation:fadeUp .5s .1s ease forwards}
+.src-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px 28px}
+.src-narrative{font-family:var(--font-serif);font-size:.88rem;line-height:1.7;color:var(--text);margin-bottom:16px}
+.src-narrative em{color:var(--accent);font-style:normal;font-weight:500}
+.src-legend{display:flex;gap:20px;margin-bottom:14px;flex-wrap:wrap}
+.src-legend-item{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:.64rem;color:var(--text-dim)}
+.src-legend-dot{width:8px;height:8px;border-radius:2px}
+.src-top-list{display:flex;gap:6px;flex-wrap:wrap}
+.src-sub-label{font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.src-chip{font-family:var(--font-mono);font-size:.68rem;padding:4px 10px;border-radius:4px;
+  border:1px solid var(--border);background:var(--bg);cursor:pointer;transition:all .15s}
+.src-chip:hover{border-color:var(--border-hi);background:var(--bg-hover)}
+.src-chip .src-pos{font-weight:600;margin-right:4px}
+.src-chip .src-wt{color:var(--text-muted);font-size:.58rem;margin-left:4px}
+.src-collapse{margin-top:14px}
+.src-collapse-toggle{display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none}
+.src-collapse-toggle .src-arrow{display:inline-block;font-size:.5rem;color:var(--text-muted);
+  transition:transform .2s;width:10px;text-align:center}
+.src-collapse-toggle:hover .src-arrow{color:var(--accent)}
+.src-collapse.open .src-arrow{transform:rotate(90deg)}
+.src-collapse-body{display:none;margin-top:6px}
+.src-collapse.open .src-collapse-body{display:block}
+.attn-heads-list{display:flex;flex-direction:column;gap:3px;margin-top:4px}
+.attn-head-row{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:4px;
+  cursor:pointer;transition:background .15s;font-family:var(--font-mono);font-size:.64rem}
+.attn-head-row:hover{background:var(--bg-hover)}
+.attn-head-row .ch-id{width:52px;flex-shrink:0;color:var(--text-dim);font-weight:600}
+.attn-head-row .ch-bar-track{flex:1;height:6px;background:var(--bg-hover);border-radius:3px;overflow:hidden;min-width:60px}
+.attn-head-row .ch-bar-fill{height:100%;border-radius:3px;transition:width .3s ease}
+.attn-head-row .ch-pct{width:38px;text-align:right;flex-shrink:0;color:var(--text-muted);font-size:.58rem}
+.attn-head-row .ch-proj{width:38px;text-align:right;flex-shrink:0;font-size:.58rem}
+.attn-head-row .ch-proj.pos{color:var(--up)}
+.attn-head-row .ch-proj.neg{color:var(--down)}
+.info-tip{position:relative;display:inline-flex;align-items:center;justify-content:center;
+  width:14px;height:14px;border-radius:50%;border:1px solid var(--text-muted);
+  font-family:var(--font-serif);font-size:.56rem;color:var(--text-muted);cursor:help;
+  margin-left:6px;flex-shrink:0;vertical-align:middle;line-height:1;text-transform:none;letter-spacing:normal}
+.info-tip:hover{border-color:var(--accent);color:var(--accent)}
+.info-tip .info-bubble{display:none;position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  width:260px;padding:10px 12px;background:var(--bg-card);border:1px solid var(--border-hi);
+  border-radius:8px;font-family:var(--font-sans);font-size:.68rem;line-height:1.55;
+  color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.4);z-index:100;pointer-events:none;
+  text-transform:none;letter-spacing:normal;font-weight:normal}
+.info-tip .info-bubble::after{content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:var(--border-hi)}
+.info-tip:hover .info-bubble{display:block}
+
+/* CHAPTERS */
+.chapters{opacity:0;animation:fadeUp .5s .15s ease forwards}
+
+.chapter{margin-bottom:8px;position:relative}
+.ch-header{display:flex;align-items:center;gap:14px;padding:14px 18px;background:var(--bg-card);
+  border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.ch-header:hover{background:var(--bg-hover);border-color:var(--border-hi)}
+.ch-header.open{border-radius:10px 10px 0 0;border-color:var(--border-hi)}
+.ch-num{font-family:var(--font-mono);font-size:.72rem;font-weight:700;width:28px;height:28px;
+  display:flex;align-items:center;justify-content:center;border-radius:6px;flex-shrink:0}
+.ch-title-area{flex:1;min-width:0}
+.ch-title{font-family:var(--font-sans);font-size:.88rem;font-weight:600;color:var(--text-bright);margin-bottom:2px}
+.ch-subtitle{font-family:var(--font-serif);font-size:.74rem;color:var(--text-dim);font-style:italic;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch-prob{font-family:var(--font-mono);font-size:.7rem;color:var(--text-dim);text-align:right;min-width:80px}
+.ch-prob em{font-style:normal;font-weight:600}
+.ch-arrow{font-size:.7rem;color:var(--text-muted);transition:transform .2s;flex-shrink:0}
+.ch-header.open .ch-arrow{transform:rotate(90deg)}
+
+.ch-body{max-height:0;overflow:hidden;transition:max-height .5s cubic-bezier(.16,1,.3,1),opacity .3s;opacity:0;
+  background:var(--bg-expand);border:1px solid var(--border-hi);border-top:0;border-radius:0 0 10px 10px}
+.ch-body.open{max-height:3000px;opacity:1}
+.ch-inner{padding:20px 24px 24px}
+
+.ch-narr{font-family:var(--font-serif);font-size:.92rem;line-height:1.75;color:var(--text);margin-bottom:18px}
+.ch-narr em{color:var(--accent);font-style:normal;font-weight:500}
+.ch-narr strong{color:var(--text-bright);font-weight:500}
+
+/* Feature display in chapters */
+.feat-section{margin-bottom:16px}
+.feat-label{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.feat-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.feat-grid{display:flex;flex-direction:column;gap:4px}
+.feat-row{display:flex;align-items:center;gap:10px;padding:6px 12px;background:var(--bg-card);
+  border-radius:5px;border:1px solid var(--border);transition:border-color .15s}
+.feat-row:hover{border-color:var(--border-hi)}
+.feat-id{font-family:var(--font-mono);font-size:.64rem;color:var(--text-muted);min-width:52px}
+.feat-summary{font-family:var(--font-sans);font-size:.76rem;color:var(--text);flex:1}
+.feat-summary .feat-tag{font-family:var(--font-mono);font-size:.6rem;padding:1px 5px;border-radius:2px;margin-left:4px}
+.feat-bar-wrap{width:60px;height:8px;background:var(--bg);border-radius:2px;overflow:hidden;flex-shrink:0}
+.feat-bar{height:100%;border-radius:2px}
+.feat-val{font-family:var(--font-mono);font-size:.62rem;color:var(--text-dim);min-width:44px;text-align:right}
+
+/* Per-head in chapters */
+.ch-heads{margin-bottom:16px}
+.ch-heads-label{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:6px}
+.hgrid{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px}
+.hcell{width:30px;height:24px;border-radius:3px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:.58rem;cursor:pointer;transition:all .12s;border:1px solid transparent}
+.hcell:hover{transform:scale(1.08);border-color:rgba(255,255,255,.15)}
+.hcell.hl{border-color:var(--accent);box-shadow:0 0 8px rgba(56,189,248,.2)}
+.hdesc{font-family:var(--font-serif);font-size:.76rem;color:var(--text-dim);line-height:1.6;
+  padding:6px 12px;background:var(--bg);border-radius:4px;margin-bottom:5px;border-left:2px solid var(--border)}
+.hdesc b{color:var(--text-bright);font-weight:500;font-family:var(--font-mono);font-size:.72rem}
+.tag{display:inline-block;padding:1px 6px;border-radius:2px;font-family:var(--font-mono);font-size:.58rem;font-weight:500;margin:0 1px}
+.tag.st{background:var(--structural-dim);color:var(--structural)}
+.tag.co{background:var(--coevol-dim);color:var(--coevol)}
+.tag.lo{background:var(--local-dim);color:var(--local)}
+
+/* ── WRITE / ERASE SPLIT ── */
+.dynamics-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.dynamics-col{background:var(--bg);border-radius:8px;padding:14px 16px;border:1px solid var(--border)}
+.dynamics-col.writers{border-color:rgba(45,212,160,.15)}
+.dynamics-col.erasers{border-color:rgba(248,113,113,.15)}
+.dynamics-col-head{display:flex;align-items:center;gap:7px;margin-bottom:10px}
+.dynamics-col-icon{width:18px;height:18px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700}
+.dynamics-col-icon.w{background:rgba(45,212,160,.12);color:var(--writer)}
+.dynamics-col-icon.e{background:rgba(248,113,113,.12);color:var(--eraser)}
+.dynamics-col-title{font-family:var(--font-mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase}
+.dynamics-col.writers .dynamics-col-title{color:var(--writer)}
+.dynamics-col.erasers .dynamics-col-title{color:var(--eraser)}
+.dynamics-col-desc{font-family:var(--font-serif);font-size:.68rem;color:var(--text-muted);font-style:italic;margin-bottom:8px;line-height:1.5}
+
+/* ── ATTENTION vs MLP FEATURE ROWS ── */
+.feat-row-v2{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:4px;margin-bottom:3px;
+  background:var(--bg-card);border:1px solid var(--border);transition:border-color .15s}
+.feat-row-v2:hover{border-color:var(--border-hi)}
+.feat-source-pip{width:4px;height:22px;border-radius:2px;flex-shrink:0}
+.feat-source-pip.attn{background:var(--structural)}
+.feat-source-pip.mlp{background:var(--mlp-color)}
+.feat-source-pip.both{background:linear-gradient(180deg,var(--structural) 50%,var(--mlp-color) 50%)}
+.feat-id-v2{font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);min-width:42px}
+.feat-body{flex:1;min-width:0}
+.feat-summary-v2{font-family:var(--font-sans);font-size:.74rem;color:var(--text);line-height:1.3}
+.feat-meta{display:flex;gap:8px;align-items:center;margin-top:2px}
+.feat-source-tag{font-family:var(--font-mono);font-size:.52rem;padding:1px 5px;border-radius:2px;letter-spacing:.04em}
+.feat-source-tag.attn{background:rgba(34,211,238,.08);color:var(--structural)}
+.feat-source-tag.mlp{background:var(--mlp-dim);color:var(--mlp-color)}
+.feat-aa-vote{font-family:var(--font-mono);font-size:.58rem;padding:1px 5px;border-radius:2px;font-weight:600}
+.feat-proj-v2{font-family:var(--font-mono);font-size:.64rem;min-width:44px;text-align:right;font-weight:500}
+.feat-proj-v2.pos{color:var(--writer)}
+.feat-proj-v2.neg{color:var(--eraser)}
+
+/* ── VELOCITY INSIGHT CALLOUT ── */
+.velocity-insight{margin:14px 0;padding:12px 16px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(56,189,248,.04),rgba(192,132,252,.04));
+  border:1px solid rgba(56,189,248,.12);position:relative;overflow:hidden}
+.velocity-insight::before{content:'⚡';position:absolute;top:10px;left:14px;font-size:.7rem;opacity:.7}
+.velocity-insight-text{font-family:var(--font-serif);font-size:.76rem;color:var(--text-dim);line-height:1.65;padding-left:24px}
+.velocity-insight-text em{color:var(--accent);font-style:normal;font-weight:500}
+.velocity-insight-text strong{color:var(--text-bright);font-weight:500}
+
+/* ── KEY HEADS (narrative-first) ── */
+.key-heads{margin-bottom:16px}
+.key-head-card{display:flex;gap:12px;align-items:flex-start;padding:10px 14px;background:var(--bg);
+  border-radius:6px;margin-bottom:4px;border:1px solid var(--border);cursor:pointer;transition:all .15s}
+.key-head-card:hover{border-color:var(--border-hi);background:var(--bg-hover)}
+.key-head-badge{font-family:var(--font-mono);font-size:.7rem;font-weight:700;padding:4px 8px;
+  border-radius:5px;flex-shrink:0;text-align:center;min-width:48px}
+.key-head-badge.pos{background:rgba(45,212,160,.12);color:var(--writer)}
+.key-head-badge.neg{background:rgba(248,113,113,.12);color:var(--eraser)}
+.key-head-info{flex:1}
+.key-head-role{font-family:var(--font-sans);font-size:.78rem;color:var(--text);line-height:1.4}
+.key-head-role em{color:var(--accent);font-style:normal}
+.key-head-detail{font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted);margin-top:3px}
+.key-head-proj{font-family:var(--font-mono);font-size:.72rem;font-weight:600;flex-shrink:0;min-width:48px;text-align:right}
+.key-head-proj.pos{color:var(--writer)}
+.key-head-proj.neg{color:var(--eraser)}
+.minor-heads{font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted);padding:6px 14px;
+  cursor:pointer;border-radius:4px;transition:background .12s}
+.minor-heads:hover{background:var(--bg-hover)}
+.minor-heads-grid{display:none;margin-top:6px}
+.minor-heads-grid.open{display:flex;flex-wrap:wrap;gap:3px}
+
+/* ── VOTE TALLY (for prediction layers) ── */
+.vote-tally{margin-bottom:16px}
+.vote-group{margin-bottom:8px}
+.vote-aa-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.vote-aa-letter{font-family:var(--font-mono);font-size:1.1rem;font-weight:700;width:28px;text-align:center}
+.vote-aa-name{font-family:var(--font-serif);font-size:.72rem;color:var(--text-dim);font-style:italic}
+.vote-aa-bar{flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden}
+.vote-aa-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+.vote-aa-pct{font-family:var(--font-mono);font-size:.62rem;color:var(--text-dim);min-width:40px;text-align:right}
+.vote-features{display:flex;gap:4px;flex-wrap:wrap;padding-left:36px;margin-bottom:2px}
+.vote-feat-chip{font-family:var(--font-mono);font-size:.56rem;padding:2px 6px;border-radius:3px;
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-dim)}
+
+/* ── IDENTITY CARD (layer 1) ── */
+.identity-card{display:flex;gap:24px;align-items:center;padding:20px 24px;background:var(--bg);
+  border-radius:8px;border:1px solid var(--border);margin-bottom:16px}
+.identity-aa{font-family:var(--font-mono);font-size:3rem;font-weight:700;line-height:1}
+.identity-props{display:flex;flex-wrap:wrap;gap:6px}
+.identity-prop{font-family:var(--font-mono);font-size:.6rem;padding:3px 8px;border-radius:3px;
+  background:var(--bg-card);border:1px solid var(--border);color:var(--text-dim)}
+.identity-prop em{color:var(--text);font-style:normal;font-weight:500}
+
+/* ── MLP SECTION REDESIGN ── */
+.mlp-section-v2{margin-bottom:16px}
+.mlp-headline{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.mlp-net{font-family:var(--font-mono);font-size:1rem;font-weight:700}
+.mlp-net.pos{color:var(--writer)}
+.mlp-net.neg{color:var(--eraser)}
+.mlp-net.quiet{color:var(--text-muted)}
+.mlp-role{font-family:var(--font-serif);font-size:.78rem;color:var(--text-dim);font-style:italic}
+
+/* ── THE EQUATION ── */
+.equation-section{margin-bottom:44px;opacity:0;animation:fadeUp .5s .08s ease forwards}
+.eq-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:28px 32px;position:relative;overflow:hidden}
+.eq-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--writer),var(--accent),var(--eraser))}
+
+.eq-headline{font-family:var(--font-sans);font-size:1.1rem;font-weight:600;color:var(--text-bright);margin-bottom:6px;line-height:1.4}
+.eq-story{font-family:var(--font-serif);font-size:.92rem;line-height:1.75;color:var(--text);margin-bottom:22px}
+.eq-story em{color:var(--accent);font-style:normal;font-weight:500}
+.eq-story strong{color:var(--text-bright);font-weight:500}
+
+/* Evidence / Perception / Decision phases */
+.eq-evidence{margin-bottom:22px;padding:16px 18px;border-radius:8px;background:var(--bg);border:1px solid var(--border)}
+.eq-evidence-title{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.eq-evidence-text{font-family:var(--font-serif);font-size:.82rem;color:var(--text);line-height:1.7}
+.eq-evidence-env{font-family:var(--font-mono);font-size:.64rem;color:var(--text-dim);margin-top:8px;padding:6px 10px;
+  background:var(--bg-card);border-radius:4px;border:1px solid var(--border)}
+
+.eq-info-sources{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.eq-info-src{font-family:var(--font-mono);font-size:.62rem;color:var(--text-dim);padding:5px 10px;
+  background:var(--bg-card);border-radius:4px;border:1px solid var(--border);line-height:1.4}
+
+.eq-decision{margin-bottom:22px;padding:16px 18px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(56,189,248,.02),rgba(45,212,160,.02));
+  border:1px solid rgba(56,189,248,.12)}
+.eq-decision-title{font-family:var(--font-mono);font-size:.52rem;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.eq-decision-text{font-family:var(--font-serif);font-size:.82rem;color:var(--text);line-height:1.7}
+.eq-transition{font-family:var(--font-serif);font-size:.76rem;color:var(--text-dim);line-height:1.6;
+  margin-top:10px;padding:8px 12px;border-left:2px solid var(--accent);background:var(--bg)}
+
+/* Race chart */
+.eq-race{margin-bottom:22px}
+.eq-race-title{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.eq-race-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.eq-race-chart{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:16px 12px 8px;position:relative}
+
+/* Candidates */
+.eq-candidates{margin-bottom:20px}
+.eq-cand-title{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.eq-cand-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.eq-candidate{margin-bottom:10px;border-radius:8px;overflow:hidden;border:1px solid var(--border);transition:border-color .15s}
+.eq-candidate:hover{border-color:var(--border-hi)}
+.eq-candidate.winner{border-color:rgba(45,212,160,.2)}
+.eq-candidate.wrong-winner{border-color:rgba(248,113,113,.15)}
+.eq-candidate.correct-answer{border-color:rgba(56,189,248,.2)}
+.eq-cand-header{display:flex;align-items:center;gap:12px;padding:12px 14px}
+.eq-candidate.winner .eq-cand-header{background:rgba(45,212,160,.04)}
+.eq-candidate.wrong-winner .eq-cand-header{background:rgba(248,113,113,.03)}
+.eq-candidate.correct-answer .eq-cand-header{background:rgba(56,189,248,.03)}
+.eq-candidate.contender .eq-cand-header{background:var(--bg)}
+.eq-cand-aa{font-family:var(--font-mono);font-size:1.4rem;font-weight:700;min-width:28px;text-align:center}
+.eq-cand-info{flex:1;min-width:0}
+.eq-cand-name{font-family:var(--font-serif);font-size:.82rem;color:var(--text-bright)}
+.eq-cand-role{font-family:var(--font-mono);font-size:.54rem;color:var(--text-muted);margin-top:1px}
+.eq-cand-prob{font-family:var(--font-mono);font-size:.88rem;font-weight:600;min-width:60px;text-align:right}
+.eq-cand-narr{padding:8px 14px 4px;font-family:var(--font-serif);font-size:.78rem;color:var(--text-dim);line-height:1.65}
+.eq-cand-layers{font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted);padding:0 14px 4px}
+.eq-cand-trajectory{display:flex;gap:2px;padding:4px 14px 8px;align-items:flex-end;height:40px}
+.eq-cand-tbar{flex:1;border-radius:2px 2px 0 0;min-width:0;transition:height .5s cubic-bezier(.16,1,.3,1)}
+.eq-cand-evidence{padding:6px 14px 10px;background:var(--bg);display:flex;flex-direction:column;gap:3px}
+.eq-cand-ev-item{font-family:var(--font-mono);font-size:.62rem;color:var(--text-dim);padding:3px 8px;
+  background:var(--bg-card);border-radius:3px;border:1px solid var(--border);line-height:1.4}
+
+/* Turning points */
+.eq-turns{margin-bottom:20px}
+.eq-turn{margin-bottom:8px;padding:12px 16px;border-radius:8px;
+  background:linear-gradient(135deg,rgba(56,189,248,.03),rgba(192,132,252,.03));
+  border:1px solid rgba(56,189,248,.1);position:relative;overflow:hidden}
+.eq-turn::before{content:'⚡';position:absolute;top:10px;left:14px;font-size:.7rem;opacity:.6}
+.eq-turn-range{font-family:var(--font-mono);font-size:.6rem;color:var(--accent);font-weight:600;margin-bottom:4px;padding-left:22px}
+.eq-turn-text{font-family:var(--font-serif);font-size:.78rem;color:var(--text);line-height:1.65;padding-left:22px}
+
+/* Resolution */
+.eq-resolution{margin-top:18px;padding:16px;border-radius:8px}
+.eq-resolution.correct{background:linear-gradient(135deg,rgba(45,212,160,.04),rgba(56,189,248,.04));
+  border:1px solid rgba(45,212,160,.15)}
+.eq-resolution.incorrect{background:linear-gradient(135deg,rgba(248,113,113,.04),rgba(251,191,36,.04));
+  border:1px solid rgba(248,113,113,.15)}
+.eq-resolution-title{font-family:var(--font-mono);font-size:.56rem;letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.eq-resolution.correct .eq-resolution-title{color:var(--writer)}
+.eq-resolution.incorrect .eq-resolution-title{color:var(--eraser)}
+.eq-resolution-text{font-family:var(--font-serif);font-size:.82rem;color:var(--text);line-height:1.7}
+
+/* Fallback (no narrative) */
+.eq-fallback{font-family:var(--font-serif);font-size:.86rem;color:var(--text-dim);line-height:1.7;text-align:center;padding:32px 20px}
+.eq-fallback code{font-family:var(--font-mono);font-size:.78rem;color:var(--accent);background:var(--bg);padding:2px 8px;border-radius:4px}
+
+/* ── DEEP DIVES ── */
+.eq-dives{margin-top:20px}
+.eq-dives-title{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);letter-spacing:.1em;
+  text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.eq-dives-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.dd-card{margin-bottom:6px;border-radius:8px;border:1px solid var(--border);overflow:hidden;transition:border-color .15s}
+.dd-card:hover{border-color:var(--border-hi)}
+.dd-card.open{border-color:rgba(56,189,248,.2)}
+.dd-header{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
+  background:var(--bg-card);transition:background .12s}
+.dd-header:hover{background:var(--bg-hover)}
+.dd-card.open .dd-header{background:var(--bg-hover)}
+.dd-icon{font-size:.7rem;width:22px;height:22px;display:flex;align-items:center;justify-content:center;
+  border-radius:5px;background:rgba(56,189,248,.08);color:var(--accent);flex-shrink:0}
+.dd-label{font-family:var(--font-sans);font-size:.78rem;font-weight:500;color:var(--text-bright);flex:1}
+.dd-arrow{font-size:.6rem;color:var(--text-muted);transition:transform .2s;flex-shrink:0}
+.dd-card.open .dd-arrow{transform:rotate(90deg)}
+.dd-body{max-height:0;overflow:hidden;transition:max-height .4s cubic-bezier(.16,1,.3,1),opacity .3s;opacity:0;
+  background:var(--bg-expand)}
+.dd-card.open .dd-body{max-height:2000px;opacity:1}
+.dd-inner{padding:14px 16px}
+.dd-caption{font-family:var(--font-serif);font-size:.78rem;color:var(--text-dim);line-height:1.6;margin-bottom:14px;
+  padding:8px 12px;background:var(--bg);border-radius:6px;border-left:2px solid var(--accent)}
+
+/* Deep dive: MLP table */
+.dd-mlp-layer{margin-bottom:14px}
+.dd-mlp-layer-head{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.dd-mlp-layer-label{font-family:var(--font-mono);font-size:.64rem;font-weight:600;color:var(--text)}
+.dd-mlp-layer-net{font-family:var(--font-mono);font-size:.62rem;font-weight:600;padding:2px 8px;border-radius:3px}
+.dd-mlp-layer-net.pos{background:rgba(45,212,160,.1);color:var(--writer)}
+.dd-mlp-layer-net.neg{background:rgba(248,113,113,.1);color:var(--eraser)}
+.dd-mlp-layer-count{font-family:var(--font-mono);font-size:.54rem;color:var(--text-muted)}
+.dd-neuron{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg-card);
+  border-radius:4px;margin-bottom:3px;border:1px solid var(--border)}
+.dd-neuron-id{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);min-width:46px}
+.dd-neuron-proj{font-family:var(--font-mono);font-size:.66rem;font-weight:600;min-width:48px;text-align:right}
+.dd-neuron-proj.pos{color:var(--writer)}
+.dd-neuron-proj.neg{color:var(--eraser)}
+.dd-neuron-votes{flex:1;display:flex;gap:4px;flex-wrap:wrap}
+.dd-neuron-vote{font-family:var(--font-mono);font-size:.54rem;padding:1px 5px;border-radius:2px;
+  border:1px solid var(--border);background:var(--bg)}
+.dd-neuron-vote .aa{font-weight:600;margin-right:2px}
+
+/* Deep dive: SAE features */
+.dd-feat{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-card);
+  border-radius:4px;margin-bottom:3px;border:1px solid var(--border);transition:border-color .15s}
+.dd-feat:hover{border-color:var(--border-hi)}
+.dd-feat.highlighted{border-color:rgba(56,189,248,.3);background:rgba(56,189,248,.03)}
+.dd-feat-pip{width:3px;height:20px;border-radius:2px;flex-shrink:0}
+.dd-feat-pip.attn{background:var(--structural)}
+.dd-feat-pip.mlp{background:var(--mlp-color)}
+.dd-feat-id{font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);min-width:42px}
+.dd-feat-body{flex:1;min-width:0}
+.dd-feat-summary{font-family:var(--font-sans);font-size:.72rem;color:var(--text);line-height:1.3}
+.dd-feat-meta{font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);margin-top:2px}
+.dd-feat-proj{font-family:var(--font-mono);font-size:.64rem;font-weight:600;min-width:44px;text-align:right}
+.dd-feat-proj.pos{color:var(--writer)}
+.dd-feat-proj.neg{color:var(--eraser)}
+
+/* Deep dive: Attention heads */
+.dd-head-row{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg-card);
+  border-radius:4px;margin-bottom:3px;border:1px solid var(--border);cursor:pointer;transition:all .12s}
+.dd-head-row:hover{border-color:var(--border-hi);background:var(--bg-hover)}
+.dd-head-id{font-family:var(--font-mono);font-size:.64rem;font-weight:600;color:var(--text);min-width:56px}
+.dd-head-type{font-family:var(--font-mono);font-size:.5rem;padding:1px 5px;border-radius:2px}
+.dd-head-type.structural{background:var(--structural-dim);color:var(--structural)}
+.dd-head-type.coevol{background:var(--coevol-dim);color:var(--coevol)}
+.dd-head-type.local{background:var(--local-dim);color:var(--local)}
+.dd-head-desc{font-family:var(--font-serif);font-size:.7rem;color:var(--text-dim);flex:1}
+.dd-head-proj{font-family:var(--font-mono);font-size:.64rem;font-weight:600;min-width:44px;text-align:right}
+.dd-head-proj.pos{color:var(--writer)}
+.dd-head-proj.neg{color:var(--eraser)}
+
+/* Deep dive: Velocity */
+.dd-vel-chart{background:var(--bg);border-radius:6px;padding:8px;margin-bottom:8px}
+.dd-vel-row{display:grid;grid-template-columns:38px 1fr 1fr 60px;gap:4px;align-items:center;padding:3px 8px;
+  border-radius:3px;margin-bottom:2px}
+.dd-vel-row:nth-child(odd){background:rgba(255,255,255,.01)}
+.dd-vel-layer{font-family:var(--font-mono);font-size:.62rem;color:var(--text-dim)}
+.dd-vel-bar{height:14px;border-radius:2px;display:flex;align-items:center;justify-content:flex-end;padding:0 4px;
+  font-family:var(--font-mono);font-size:.48rem;color:rgba(255,255,255,.6)}
+.dd-vel-bar.attn-pos{background:rgba(34,211,238,.25)}
+.dd-vel-bar.attn-neg{background:rgba(34,211,238,.15)}
+.dd-vel-bar.mlp-pos{background:rgba(192,132,252,.25)}
+.dd-vel-bar.mlp-neg{background:rgba(192,132,252,.15)}
+.dd-vel-race{font-family:var(--font-mono);font-size:.56rem;color:var(--text-dim);text-align:right}
+
+/* MLP neurons */
+.mlp-summary{font-family:var(--font-serif);font-size:.78rem;color:var(--text-dim);line-height:1.6;margin-bottom:8px}
+.mlp-summary em{color:var(--mlp-color);font-style:normal}
+.nrow{display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--bg-card);border-radius:4px;margin-bottom:3px;font-family:var(--font-mono);font-size:.7rem}
+.nid{color:var(--text-muted);min-width:48px}
+.nproj{font-weight:600;min-width:50px;text-align:right}
+.nproj.pos{color:var(--writer)}
+.nproj.neg{color:var(--eraser)}
+.nvotes{color:var(--text-dim);flex:1;font-size:.66rem}
+.nvotes span{margin-right:6px}
+
+/* ── FULL LAYER EXPLORER ── */
+.explorer{opacity:0;animation:fadeUp .5s .15s ease forwards}
+.explorer-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.explorer-controls{display:flex;align-items:center;gap:6px;padding:12px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.explorer-tab{font-family:var(--font-mono);font-size:.56rem;padding:4px 10px;border-radius:4px;cursor:pointer;
+  color:var(--text-muted);background:transparent;border:1px solid transparent;transition:all .12s;letter-spacing:.04em;white-space:nowrap}
+.explorer-tab:hover{color:var(--text-dim);background:var(--bg-hover)}
+.explorer-tab.active{color:var(--accent);background:var(--accent-dim);border-color:rgba(56,189,248,.2)}
+.explorer-body{display:flex;overflow-x:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;padding:6px 14px 0}
+.explorer-body::-webkit-scrollbar{height:4px}
+.explorer-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.hm-labels{display:flex;flex-direction:column;flex-shrink:0;padding-top:22px}
+.hm-layer-label{height:18px;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;
+  font-family:var(--font-mono);font-size:.52rem;color:var(--text-muted);cursor:pointer;transition:color .1s}
+.hm-layer-label:hover{color:var(--accent)}
+.hm-layer-label.sel{color:var(--accent);font-weight:700}
+.hm-grid-wrap{flex-shrink:0;min-width:0}
+.hm-head-labels{display:flex;height:20px;margin-bottom:2px}
+.hm-head-num{width:24px;font-family:var(--font-mono);font-size:.46rem;color:var(--text-muted);text-align:center;flex-shrink:0}
+.hm-row{display:flex;height:18px}
+.hm-cell{width:24px;height:18px;flex-shrink:0;cursor:pointer;transition:outline .08s;border-radius:1px;
+  outline:1px solid transparent;position:relative}
+.hm-cell:hover{outline:1px solid rgba(255,255,255,.4);z-index:2;border-radius:2px}
+.hm-cell.sel{outline:2px solid var(--accent);z-index:3;border-radius:2px;box-shadow:0 0 6px rgba(56,189,248,.3)}
+.hm-mlp-col{flex:1;min-width:120px;padding:0 0 0 14px;display:flex;flex-direction:column;
+  border-left:1px solid var(--border);margin-left:12px}
+.hm-mlp-col-header{font-family:var(--font-mono);font-size:.46rem;color:var(--text-dim);
+  height:22px;display:flex;align-items:flex-end;justify-content:flex-start;padding-bottom:4px;
+  letter-spacing:.04em;white-space:nowrap;text-transform:uppercase}
+.hm-mlp-row{display:flex;align-items:center;height:18px;cursor:pointer;border-radius:3px;
+  transition:background .1s;padding:0 6px}
+.hm-mlp-row:hover{background:var(--bg-hover)}
+.hm-mlp-row.sel{background:var(--accent-dim)}
+.hm-mlp-bar-area{flex:1;height:14px;position:relative;flex-shrink:0}
+.hm-mlp-center-line{position:absolute;left:50%;top:2px;bottom:2px;width:1px;background:var(--border)}
+.hm-mlp-bar-v2{height:10px;border-radius:2px;position:absolute;top:2px;min-width:1px;
+  transition:width .3s cubic-bezier(.16,1,.3,1)}
+.hm-mlp-bar-v2.pos{left:50%;background:var(--writer)}
+.hm-mlp-bar-v2.neg{right:50%;background:var(--eraser)}
+.hm-mlp-val{font-family:var(--font-mono);font-size:.52rem;width:40px;text-align:right;
+  padding-left:6px;flex-shrink:0;font-weight:600}
+.hm-mlp-val.pos{color:var(--writer)}
+.hm-mlp-val.neg{color:var(--eraser)}
+.hm-mlp-val.quiet{color:var(--text-muted);font-weight:400}
+
+.hm-vel-col{flex-shrink:0;padding:0 4px 0 6px;display:flex;flex-direction:column;
+  border-left:1px solid var(--border);margin-left:8px}
+.hm-vel-col-header{font-family:var(--font-mono);font-size:.42rem;color:var(--text-muted);
+  text-align:center;height:22px;display:flex;align-items:flex-end;justify-content:center;
+  padding-bottom:4px;letter-spacing:.04em;white-space:nowrap}
+.hm-vel-cell{height:18px;width:32px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-size:.44rem;border-radius:2px;cursor:default}
+.hm-scale{display:flex;align-items:center;gap:6px;padding:8px 16px 10px;
+  font-family:var(--font-mono);font-size:.44rem;color:var(--text-muted)}
+.hm-scale-bar{flex:1;height:5px;border-radius:3px;max-width:180px}
+.hm-scale-bar.diverging{background:linear-gradient(90deg,var(--eraser),rgba(0,0,0,0) 50%,var(--writer))}
+
+.hm-tooltip{position:fixed;z-index:200;background:var(--bg-surface);border:1px solid var(--border-hi);border-radius:6px;
+  padding:8px 12px;pointer-events:none;display:none;max-width:260px;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.hm-tooltip .hmt-title{font-family:var(--font-mono);font-size:.64rem;color:var(--text-bright);font-weight:600;margin-bottom:3px}
+.hm-tooltip .hmt-val{font-family:var(--font-mono);font-size:.72rem;font-weight:700;margin-bottom:2px}
+.hm-tooltip .hmt-val.pos{color:var(--writer)}
+.hm-tooltip .hmt-val.neg{color:var(--eraser)}
+.hm-tooltip .hmt-row{font-family:var(--font-mono);font-size:.52rem;color:var(--text-dim);line-height:1.4}
+
+.exp-detail{border-top:1px solid var(--border);padding:16px 20px;animation:fadeUp .15s ease}
+.exp-detail-title{font-family:var(--font-mono);font-size:.6rem;color:var(--accent);font-weight:600;margin-bottom:10px;
+  display:flex;align-items:center;gap:8px}
+.exp-detail-title .exp-close{cursor:pointer;color:var(--text-muted);font-size:.68rem;margin-left:auto;
+  padding:2px 6px;border-radius:3px;transition:background .1s}
+.exp-detail-title .exp-close:hover{background:var(--bg-hover);color:var(--text)}
+.exp-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:700px){.exp-detail-grid{grid-template-columns:1fr}}
+.exp-detail-section{background:var(--bg);border-radius:8px;padding:12px 14px;border:1px solid var(--border)}
+.exp-detail-section-title{font-family:var(--font-mono);font-size:.48rem;color:var(--text-muted);
+  letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+.exp-src-row{display:flex;align-items:center;gap:8px;padding:3px 8px;border-radius:3px;margin-bottom:2px;
+  font-family:var(--font-mono);font-size:.64rem;cursor:pointer;transition:background .1s}
+.exp-src-row:hover{background:var(--bg-hover)}
+.exp-src-pos{font-weight:600;min-width:32px}
+.exp-src-aa{min-width:14px;font-weight:700}
+.exp-src-wt{color:var(--text-dim);min-width:38px;text-align:right}
+.exp-neuron-row{display:flex;align-items:center;gap:6px;padding:3px 8px;border-radius:3px;margin-bottom:2px;
+  font-family:var(--font-mono);font-size:.62rem}
+.exp-neuron-id{color:var(--text-muted);min-width:44px}
+.exp-neuron-proj{font-weight:600;min-width:44px;text-align:right}
+.exp-neuron-proj.pos{color:var(--writer)}
+.exp-neuron-proj.neg{color:var(--eraser)}
+.exp-neuron-votes{flex:1;font-size:.56rem;color:var(--text-dim)}
+.exp-neuron-votes span{margin-right:5px}
+.exp-attn-breakdown{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.exp-attn-chip{font-family:var(--font-mono);font-size:.5rem;padding:2px 7px;border-radius:3px;display:flex;align-items:center;gap:3px}
+.exp-attn-chip.structural{background:var(--structural-dim);color:var(--structural)}
+.exp-attn-chip.coevol{background:var(--coevol-dim);color:var(--coevol)}
+.exp-attn-chip.local{background:var(--local-dim);color:var(--local)}
+.exp-attn-chip.other{background:var(--other-dim);color:var(--other)}
+.exp-head-summary{font-family:var(--font-serif);font-size:.78rem;color:var(--text);line-height:1.6;margin-bottom:10px}
+.exp-head-summary em{color:var(--accent);font-style:normal;font-weight:500}
+.explorer-mode-banner{font-family:var(--font-serif);font-size:.72rem;color:var(--text-dim);
+  line-height:1.5;padding:8px 14px;margin:0;border-bottom:1px solid rgba(148,163,184,.08);
+  display:none}
+.explorer-mode-banner.visible{display:block}
+.explorer-mode-banner em{color:var(--accent);font-style:normal;font-weight:500}
+.exp-stream-section{background:rgba(56,189,248,.04);border:1px solid rgba(56,189,248,.1);
+  border-radius:8px;padding:10px 14px;margin-bottom:12px}
+.exp-mlp-headline{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.exp-mlp-net{font-family:var(--font-mono);font-size:1rem;font-weight:700}
+.exp-mlp-net.pos{color:var(--writer)}
+.exp-mlp-net.neg{color:var(--eraser)}
+.exp-mlp-net.quiet{color:var(--text-muted)}
+.exp-mlp-meta{font-family:var(--font-mono);font-size:.58rem;color:var(--text-dim)}
+
+/* TRANSITIONS */
+.transition{margin:4px 0;padding:8px 18px;display:flex;align-items:center;gap:14px;
+  font-family:var(--font-mono);font-size:.66rem;color:var(--text-muted);cursor:pointer;
+  border-radius:6px;transition:background .12s}
+.transition:hover{background:var(--bg-hover);color:var(--text-dim)}
+.tr-layers{font-size:.58rem;letter-spacing:.06em;text-transform:uppercase;min-width:56px}
+.tr-summary{font-family:var(--font-serif);font-size:.72rem;color:var(--text-dim);flex:1;font-style:italic}
+.tr-vel{display:flex;gap:6px;align-items:center}
+.tr-pip{width:6px;height:6px;border-radius:50%}
+
+/* Transition expanded */
+.tr-detail{max-height:0;overflow:hidden;transition:max-height .3s ease;opacity:0;margin:-2px 0 4px}
+.tr-detail.open{max-height:800px;opacity:1;transition:max-height .4s ease,opacity .3s}
+.tr-detail-inner{padding:12px 18px;background:var(--bg-expand);border:1px solid var(--border);border-radius:6px}
+.tr-lrow{display:grid;grid-template-columns:36px 1fr 1fr 20px;align-items:center;gap:0;padding:2px 0}
+.tr-lrow .lnum{font-family:var(--font-mono);font-size:.62rem;color:var(--text-muted);text-align:right;padding-right:8px}
+.tr-vel-cell{height:16px;position:relative}
+.tr-vel-cell svg{display:block;width:100%;height:100%}
+.tr-hint{font-family:var(--font-serif);font-size:.66rem;color:var(--text-dim);grid-column:2/5;padding-left:8px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* SYNERGY */
+.synergy-section{margin-top:40px;opacity:0;animation:fadeUp .5s .2s ease forwards}
+.syn-card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:24px 28px}
+.syn-narr{font-family:var(--font-serif);font-size:.88rem;line-height:1.7;color:var(--text);margin-bottom:16px}
+.syn-narr em{color:var(--accent);font-style:normal}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.empty{text-align:center;padding:120px 0;font-family:var(--font-serif);font-size:1.05rem;color:var(--text-dim)}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;
+  animation:spin .7s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* INTERACTIVE INLINE REFERENCES */
+.layer-ref{cursor:pointer;border-bottom:1px dotted var(--text-muted);transition:border-color .15s}
+.layer-ref:hover{border-bottom-color:var(--accent)}
+.residue-ref{cursor:pointer;border-bottom:1px dotted var(--text-muted);transition:border-color .15s}
+.residue-ref:hover{border-bottom-color:var(--accent)}
+.feature-ref{cursor:help;border-bottom:1px dotted var(--text-muted);transition:border-color .15s}
+.feature-ref:hover{border-bottom-color:var(--text-dim)}
+.feature-ref strong{color:var(--text);font-weight:500}
+.pct-ref{color:var(--text-bright);font-weight:500}
+.res.narrative-hover{border-color:var(--accent)!important;background:rgba(56,189,248,.18)!important;
+  color:var(--accent)!important;box-shadow:0 0 12px rgba(56,189,248,.25)}
+.layer-ref em{transition:color .15s}
+#layer-tip{display:none;position:fixed;z-index:200;padding:10px 14px;
+  background:var(--bg-card);border:1px solid var(--border-hi);border-radius:8px;
+  font-family:var(--font-mono);font-size:.62rem;color:var(--text);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none;white-space:nowrap}
+#layer-tip .lt-title{color:var(--accent);font-weight:600;margin-bottom:6px;font-size:.66rem}
+#layer-tip table{border-collapse:collapse;width:100%}
+#layer-tip td{padding:1px 6px 1px 0}
+#layer-tip .lt-head{color:var(--text-muted);font-size:.52rem;letter-spacing:.04em}
+#layer-tip .lt-aa{font-weight:600}
+#layer-tip .lt-up{color:var(--writer)}
+#layer-tip .lt-down{color:var(--eraser)}
+#layer-tip .lt-flat{color:var(--text-muted)}
+#feature-tip{display:none;position:fixed;z-index:200;padding:8px 12px;max-width:260px;
+  background:var(--bg-card);border:1px solid var(--border-hi);border-radius:8px;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);pointer-events:none}
+#feature-tip .ft-title{font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted);margin-bottom:4px;letter-spacing:.04em}
+#feature-tip .ft-summary{font-family:var(--font-sans);font-size:.72rem;color:var(--text);line-height:1.5}
+#feature-tip .ft-stats{font-family:var(--font-mono);font-size:.6rem;color:var(--text-dim);margin-bottom:3px}
+#feature-tip .ft-aa{font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);line-height:1.6}
+</style>
+</head>
+<body>
+
+<header class="header">
+    <div class="header-title">ESM-2 <b>Mechanistic Explorer</b></div>
+    <div class="header-meta"><span>33 layers · 20 heads</span><span>650M params</span><span id="h-protein"></span></div>
+</header>
+<div class="seq-wrap">
+    <div class="seq-header">
+        <div class="seq-label">Click any residue to mask it and trace the model's computation</div>
+        <div style="display:flex;gap:20px;align-items:center">
+        <div class="proj-legend">
+            <span><span class="pl-plus">+</span> pushes toward correct amino acid</span>
+            <span><span class="pl-minus">−</span> pushes away</span>
+        </div>
+        <div class="seq-bar-legend" id="seq-bar-legend">
+            <span class="sbl-item"><span class="sbl-dot" style="background:var(--structural)"></span>Structural</span>
+            <span class="sbl-item"><span class="sbl-dot" style="background:var(--coevol)"></span>Co-evolving</span>
+            <span class="sbl-item"><span class="sbl-dot" style="background:var(--local)"></span>Local</span>
+            <span class="sbl-item"><span class="sbl-dot" style="background:var(--other)"></span>Distant</span>
+        </div>
+        </div>
+    </div>
+    <div class="seq-bar" id="seq-bar"></div>
+</div>
+<div class="main" id="main">
+    <div class="empty" id="empty-state">Select a residue to see how ESM-2 predicts it —<br>
+    <span style="font-size:.82rem;color:var(--text-muted)">traced through six stages of representation, from raw identity to final answer.</span></div>
+</div>
+
+<script>
+const DATA_ROOT='./esm2_viz_data/ubiquitin';
+const LABELS_ROOT='./esm2_viz_data';
+let META=null,POS_DATA=null,FEAT_DB=null,COEVOL_MI=null,OPEN_CHAPTER=null,ACTIVE_DIVES=[];
+
+const AA_NAMES={A:'Alanine',C:'Cysteine',D:'Aspartate',E:'Glutamate',F:'Phenylalanine',G:'Glycine',H:'Histidine',I:'Isoleucine',K:'Lysine',L:'Leucine',M:'Methionine',N:'Asparagine',P:'Proline',Q:'Glutamine',R:'Arginine',S:'Serine',T:'Threonine',V:'Valine',W:'Tryptophan',Y:'Tyrosine'};
+const AA_GROUPS={A:'hydrophobic',C:'special',D:'negative',E:'negative',F:'aromatic',G:'special',H:'positive',I:'hydrophobic',K:'positive',L:'hydrophobic',M:'hydrophobic',N:'polar',P:'special',Q:'polar',R:'positive',S:'polar',T:'polar',V:'hydrophobic',W:'aromatic',Y:'aromatic'};
+function aaColor(aa){return{hydrophobic:'#64748b',polar:'#38bdf8',positive:'#f87171',negative:'#818cf8',aromatic:'#c084fc',special:'#fbbf24'}[AA_GROUPS[aa]]||'#4a5a72'}
+
+function getMI(a,b){
+    if(!COEVOL_MI?.mi_matrix_nonzero)return null;
+    const lo=Math.min(a,b),hi=Math.max(a,b);
+    return COEVOL_MI.mi_matrix_nonzero[`${lo},${hi}`]??null;
+}
+
+// ── BIOCHEMISTRY HELPERS ──
+const AA_CHEMISTRY={
+    A:{hydrophobic:true,small:true},C:{special:true,disulfide:true},D:{charged:true,negative:true},
+    E:{charged:true,negative:true},F:{hydrophobic:true,aromatic:true,bulky:true},G:{special:true,flexible:true,small:true},
+    H:{charged:true,positive:true,aromatic:true},I:{hydrophobic:true,aliphatic:true,branched:true},
+    K:{charged:true,positive:true},L:{hydrophobic:true,aliphatic:true},M:{hydrophobic:true,sulfur:true},
+    N:{polar:true,hbond:true},P:{special:true,rigid:true,helixBreaker:true},Q:{polar:true,hbond:true},
+    R:{charged:true,positive:true},S:{polar:true,small:true,hbond:true},T:{polar:true,hbond:true},
+    V:{hydrophobic:true,aliphatic:true,branched:true},W:{hydrophobic:true,aromatic:true,bulky:true},
+    Y:{aromatic:true,hbond:true}
+};
+
+function classifySources(sources){
+    if(!sources||sources.length===0)return null;
+    const aas=sources.map(s=>s.aa).filter(Boolean);
+    if(aas.length===0)return null;
+    let nHydro=0,nCharged=0,nPolar=0,nAromatic=0,nPos=0,nNeg=0,nSpecial=0;
+    aas.forEach(aa=>{
+        const g=AA_GROUPS[aa];
+        if(g==='hydrophobic')nHydro++;
+        else if(g==='positive'){nCharged++;nPos++;}
+        else if(g==='negative'){nCharged++;nNeg++;}
+        else if(g==='polar')nPolar++;
+        else if(g==='aromatic'){nAromatic++;nHydro++;}
+        else if(g==='special')nSpecial++;
+    });
+    const n=aas.length;
+    const dominant=Math.max(nHydro,nCharged,nPolar,nAromatic,nSpecial);
+    if(nHydro>=n*.6)return{type:'hydrophobic',desc:'hydrophobic',env:'buried/core'};
+    if(nCharged>=n*.5){
+        if(nPos>nNeg)return{type:'positive',desc:'positively charged',env:'surface/salt bridge'};
+        if(nNeg>nPos)return{type:'negative',desc:'negatively charged',env:'surface/salt bridge'};
+        return{type:'charged',desc:'charged',env:'electrostatic network'};
+    }
+    if(nAromatic>=n*.4)return{type:'aromatic',desc:'aromatic',env:'aromatic cluster/pi-stacking'};
+    if(nPolar>=n*.5)return{type:'polar',desc:'polar',env:'hydrogen bonding network'};
+    if(nHydro+nAromatic>=n*.5)return{type:'hydrophobic',desc:'nonpolar',env:'protein interior'};
+    return{type:'mixed',desc:'mixed',env:'diverse chemical environment'};
+}
+
+function bioHeadNarrative(d,l,h,proj){
+    const srcs=(d.head_attention_sources||{})[`${l}_${h}`]||[];
+    const sA=d.per_head.attn_structural[l][h];
+    const cA=d.per_head.attn_coevolving[l][h];
+    const lA=d.per_head.attn_local[l][h];
+    const predAA=d.prediction.top5[0].aa;
+    const predGroup=AA_GROUPS[predAA];
+
+    if(srcs.length===0&&sA<.05&&cA<.05&&lA<.1)return null;
+
+    let parts=[];
+    let sourceDesc='';
+
+    // What is this head reading?
+    if(sA>.1){
+        const structSrcs=srcs.filter(s=>s.labels?.includes('structural'));
+        const chem=classifySources(structSrcs.length>0?structSrcs:srcs);
+        if(structSrcs.length>0){
+            const shown=structSrcs.slice(0,3);
+            const residueList=shown.map(s=>`<em>${s.aa}${s.pos+1}</em> (${AA_NAMES[s.aa]})`).join(', ');
+            if(chem){
+                sourceDesc=`reads 3D neighbors ${residueList}`;
+                if(chem.type==='hydrophobic'){
+                    parts.push(`These are <em>${chem.desc}</em> residues packed nearby in the structure — the model is sensing a <em>${chem.env}</em> environment`);
+                } else if(chem.type==='charged'||chem.type==='positive'||chem.type==='negative'){
+                    parts.push(`These are <em>${chem.desc}</em> residues — the model is reading the local <em>electrostatic environment</em>`);
+                    if(chem.type==='positive'&&(predGroup==='negative'))
+                        parts.push('The positive charges nearby favor a negatively charged residue here');
+                    else if(chem.type==='negative'&&(predGroup==='positive'))
+                        parts.push('The negative charges nearby favor a positively charged residue here');
+                } else if(chem.type==='aromatic'){
+                    parts.push(`These are <em>aromatic</em> residues — the model is detecting an <em>${chem.env}</em> region`);
+                } else if(chem.type==='polar'){
+                    parts.push(`These are <em>polar</em> residues — the model is reading a <em>${chem.env}</em>`);
+                } else {
+                    parts.push(`A mix of residue types — the model is integrating <em>diverse structural context</em>`);
+                }
+            } else {
+                sourceDesc=`reads structural contacts ${residueList}`;
+            }
+        } else {
+            sourceDesc=`reads structural context`;
+            parts.push('Gathering information from nearby residues in the 3D structure');
+        }
+    } else if(cA>.1){
+        const coSrcs=srcs.filter(s=>s.labels?.includes('coevolving'));
+        if(coSrcs.length>0){
+            const shown=coSrcs.slice(0,2);
+            const residueList=shown.map(s=>`<em>${s.aa}${s.pos+1}</em> (${AA_NAMES[s.aa]})`).join(', ');
+            sourceDesc=`reads co-evolving position${shown.length>1?'s':''} ${residueList}`;
+            parts.push(`These positions changed together across evolution — they are <em>functionally coupled</em>`);
+            // Check if there's an obvious chemical relationship
+            const coAAs=shown.map(s=>s.aa);
+            const hasCharged=coAAs.some(aa=>AA_CHEMISTRY[aa]?.charged);
+            if(hasCharged)parts.push('The charge at these positions may require compensation here');
+        } else {
+            sourceDesc=`reads co-evolutionary signal`;
+            parts.push('Positions that co-evolved indicate functional constraint — mutations here had to be compatible with mutations there');
+        }
+    } else if(lA>.15){
+        const localSrcs=srcs.filter(s=>s.labels?.includes('local'));
+        if(localSrcs.length>0){
+            const shown=localSrcs.slice(0,3);
+            const residueList=shown.map(s=>`<em>${s.aa}${s.pos+1}</em>`).join(', ');
+            sourceDesc=`reads sequence neighbors ${residueList}`;
+            parts.push('Local sequence context — this provides secondary structure and loop/turn information');
+        } else {
+            sourceDesc=`reads local sequence context`;
+            parts.push('Nearby residues in the sequence — secondary structure signal');
+        }
+    } else if(srcs.length>0){
+        const shown=srcs.slice(0,2);
+        sourceDesc=`attends to ${shown.map(s=>`<em>${s.aa}${s.pos+1}</em>`).join(', ')}`;
+    }
+
+    // How does this relate to the prediction?
+    const predChem=AA_CHEMISTRY[predAA]||{};
+    if(proj>0.3&&parts.length>0){
+        if(predChem.hydrophobic&&parts[0].includes('hydrophobic'))
+            parts.push(`This supports the prediction of <em>${predAA}</em> (${AA_NAMES[predAA]}) — a hydrophobic residue fits a buried environment`);
+        else if(predChem.charged&&parts[0].includes('charged'))
+            parts.push(`Electrostatic context shapes the prediction toward <em>${predAA}</em> (${AA_NAMES[predAA]})`);
+    }
+
+    return{sourceDesc,explanation:parts.join('. ')+(parts.length?'.':''),srcs};
+}
+
+// ═══════════════════════════════════════════
+// SAE CHAPTERS
+// ═══════════════════════════════════════════
+const CHAPTERS=[
+    {layer:1, key:'1', title:'Identity', color:'var(--ch1)',
+     desc:'What the model sees before reading any context',
+     storyFn: ch1Story},
+    {layer:9, key:'9', title:'Context Arrives', color:'var(--ch2)',
+     desc:'Structural neighbors and sequence context enter the representation',
+     storyFn: ch9Story},
+    {layer:18, key:'18', title:'Feature Processing', color:'var(--ch3)',
+     desc:'Raw context transformed into abstract biological features',
+     storyFn: ch18Story},
+    {layer:24, key:'24', title:'Stream Integration', color:'var(--ch4)',
+     desc:'Structural and co-evolutionary information streams merge',
+     storyFn: ch24Story},
+    {layer:30, key:'30', title:'Prediction Channels', color:'var(--ch5)',
+     desc:'The model votes — each feature is a ballot for a specific amino acid',
+     storyFn: ch30Story},
+    {layer:33, key:'33', title:'Final Representation', color:'var(--ch6)',
+     desc:'What the model has decided, and the context carriers that got it there',
+     storyFn: ch33Story},
+];
+
+// Transitions between chapters
+const TRANSITIONS=[
+    {from:1, to:8, after_ch:0},
+    {from:9, to:17, after_ch:1},
+    {from:18, to:23, after_ch:2},
+    {from:24, to:29, after_ch:3},
+    {from:30, to:32, after_ch:4},
+];
+
+function getFeatureLabel(layerKey, fid){
+    if(!FEAT_DB?.features?.[layerKey]?.[String(fid)])return null;
+    return FEAT_DB.features[layerKey][String(fid)];
+}
+function getFeatureSummary(layerKey, fid){
+    const f=getFeatureLabel(layerKey, fid);
+    return f?.summary || null;
+}
+
+// ═══════════════════════════════════════════
+// CHAPTER STORY GENERATORS
+// ═══════════════════════════════════════════
+function ch1Story(d){
+    const sae=d.sae_features?.['1'];if(!sae)return'No SAE data at this layer.';
+    const topFeats=[...sae.attn_top_features.slice(0,5),...sae.mlp_top_features.slice(0,5)]
+        .sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj)).slice(0,6);
+
+    // Find what AA identities are being encoded
+    const aaIdentities=[];
+    topFeats.forEach(f=>{
+        const label=getFeatureLabel('1',f.id);
+        if(label?.top_aas?.[0]?.enrichment>10){
+            const aa=label.top_aas[0].aa;
+            if(!aaIdentities.includes(aa))aaIdentities.push(aa);
+        }
+    });
+
+    let t=`At the very first layer, the model has only seen the <em>raw amino acid sequence</em> — no structural context, no evolutionary signal. `;
+    if(aaIdentities.length>0){
+        t+=`The strongest features here are pure identity encoders: `;
+        t+=aaIdentities.slice(0,4).map(aa=>`<em>${aa}</em> (${AA_NAMES[aa]})`).join(', ');
+        t+=`. Each fires with 100% specificity on a single amino acid type — the model's alphabet. `;
+    }
+    t+=`At this stage, the model knows <em>what</em> amino acids surround the masked position, but nothing about their 3D arrangement or evolutionary history.`;
+    return t;
+}
+
+function ch9Story(d){
+    const sae=d.sae_features?.['9'];if(!sae)return'';
+    const contacts=d.annotations?.structural_contacts||[];
+    const coevol=d.annotations?.coevolving_positions||[];
+    const imp=d.source_importance;
+    const structSum=imp.structural.reduce((a,b)=>a+b,0);
+    const totalSum=imp.total.reduce((a,b)=>a+b,0);
+
+    // Find what types of features have emerged
+    const topFeats=[...sae.attn_top_features.slice(0,5),...sae.mlp_top_features.slice(0,5)]
+        .sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj)).slice(0,6);
+    const contextual=[], identity=[];
+    topFeats.forEach(f=>{
+        const label=getFeatureLabel('9',f.id);
+        if(!label)return;
+        if(label.activation_rate>.3||label.terminal_bias||label.dominant_ss)contextual.push({f,label});
+        else if(label.top_aas?.[0]?.enrichment>5)identity.push({f,label});
+    });
+
+    let t=`Eight layers of attention have now read from the protein's structure. `;
+    if(contacts.length>0)t+=`The model has gathered information from <em>${contacts.length} structural contacts</em> (residues within 8Å in 3D space)`;
+    if(coevol.length>0)t+=` and <em>${coevol.length} co-evolving positions</em>`;
+    if(contacts.length>0)t+='. ';
+
+    if(contextual.length>0){
+        t+=`The features have begun to shift from pure amino acid identity toward <em>contextual encoding</em>. `;
+        const ex=contextual[0];
+        const sum=ex.label.summary;
+        t+=`For example, F${ex.f.id} now encodes "${sum}" — combining identity with structural environment. `;
+    }
+    if(structSum/totalSum>.5){
+        t+=`Structural information dominates at this position (${(structSum/totalSum*100).toFixed(0)}% of the signal).`;
+    }
+    return t;
+}
+
+function ch18Story(d){
+    const sae=d.sae_features?.['18'];if(!sae)return'';
+    const topFeats=[...sae.attn_top_features.slice(0,5),...sae.mlp_top_features.slice(0,5)]
+        .sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj)).slice(0,6);
+
+    // Check how features have changed from L9
+    let t=`Layers 10–17 have been processing — MLPs transforming raw context into <em>abstract features</em>. `;
+
+    const terminal=[], structural=[], identity=[];
+    topFeats.forEach(f=>{
+        const label=getFeatureLabel('18',f.id);
+        if(!label)return;
+        if(label.terminal_bias)terminal.push({f,label});
+        if(label.dominant_ss)structural.push({f,label});
+        if(label.top_aas?.[0]?.enrichment>5)identity.push({f,label});
+    });
+
+    if(terminal.length>0){
+        t+=`Terminal position features are now prominent — the model is encoding <em>where in the chain</em> this residue sits. `;
+    }
+    if(structural.length>0){
+        t+=`Secondary structure preferences have emerged: features encoding `;
+        t+=structural.slice(0,2).map(x=>`<em>${x.label.dominant_ss}-prone</em> character`).join(' and ');
+        t+='. ';
+    }
+
+    // Check attention vs MLP balance in recent layers
+    const vel=d.velocity;
+    const attnSum=vel.attention.slice(12,18).reduce((a,b)=>a+Math.abs(b),0);
+    const mlpSum=vel.mlp.slice(12,18).reduce((a,b)=>a+Math.abs(b),0);
+    if(mlpSum>attnSum*1.5)t+=`MLPs are doing most of the work in this phase — attention routes, MLPs compute.`;
+    else if(attnSum>mlpSum*1.5)t+=`Attention is driving changes in this phase — actively reshaping the representation.`;
+    return t;
+}
+
+function ch24Story(d){
+    const sae=d.sae_features?.['24'];if(!sae)return'';
+    let t=`This is the <em>integration point</em>. Earlier, structural information (from 3D contacts) and co-evolutionary information (from sequence conservation patterns) flowed through <em>largely separate streams</em>. `;
+    t+=`By layer 24, those streams are merging — the model now has a unified representation combining both signals. `;
+
+    const topFeats=[...sae.attn_top_features.slice(0,5),...sae.mlp_top_features.slice(0,5)]
+        .sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj)).slice(0,6);
+
+    // Check if features are getting more complex
+    const multiProperty=[];
+    topFeats.forEach(f=>{
+        const label=getFeatureLabel('24',f.id);
+        if(!label)return;
+        const nProps=(label.groups?.length||0)+(label.terminal_bias?1:0)+(label.dominant_ss?1:0);
+        if(nProps>=2)multiProperty.push({f,label});
+    });
+
+    if(multiProperty.length>0){
+        t+=`The features here are <em>richer</em> than earlier layers — combining multiple properties. `;
+        const ex=multiProperty[0];
+        t+=`F${ex.f.id} encodes "${ex.label.summary}," integrating chemical and structural information into a single representation.`;
+    }
+    return t;
+}
+
+function ch30Story(d){
+    const sae=d.sae_features?.['30'];if(!sae)return'';
+    const topFeats=[...sae.attn_top_features.slice(0,8),...sae.mlp_top_features.slice(0,8)]
+        .sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj));
+
+    // Find prediction channels vs context carriers
+    const predChannels=[], contextCarriers=[], other=[];
+    const seen=new Set();
+    topFeats.forEach(f=>{
+        if(seen.has(f.id))return;seen.add(f.id);
+        const label=getFeatureLabel('30',f.id);
+        if(!label){other.push(f);return;}
+        if(label.summary?.includes('prediction channel'))predChannels.push({f,label});
+        else if(label.summary?.includes('context carrier'))contextCarriers.push({f,label});
+        else other.push({f,label});
+    });
+
+    let t=`This is where the model <em>commits to its answer</em>. `;
+
+    if(predChannels.length>0){
+        t+=`The representation has bifurcated into two types of features. <strong>Prediction channels</strong> are razor-sharp amino acid detectors — each one fires exclusively for a single amino acid: `;
+        t+=predChannels.slice(0,3).map(x=>{
+            const aa=x.label.top_aas?.[0];
+            return aa?`F${x.f.id} for <em>${aa.aa}</em> (${aa.enrichment.toFixed(0)}× enrichment)`:`F${x.f.id}`;
+        }).join(', ');
+        t+='. These are the model\'s <em>voting mechanism</em>. ';
+    }
+
+    // Check MLP activity at L29-L31
+    const mlp29=d.mlp_neurons?.['29'];const mlp30=d.mlp_neurons?.['30'];
+    if(mlp30&&Math.abs(mlp30.total_answer_proj)>1){
+        const topN=mlp30.top_writers?.[0];
+        if(topN?.top_aa?.[0]){
+            t+=`MLP neurons at this layer are translating the accumulated context into votes — N${topN.neuron} fires strongly, voting for <em>${topN.top_aa[0][0]}</em> (${AA_NAMES[topN.top_aa[0][0]]}) with projection ${topN.answer_proj>0?'+':''}${topN.answer_proj.toFixed(2)}.`;
+        }
+    }
+    return t;
+}
+
+function ch33Story(d){
+    const sae=d.sae_features?.['33'];if(!sae)return'';
+    const topFeats=[...sae.attn_top_features.slice(0,6),...sae.mlp_top_features.slice(0,6)]
+        .sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj));
+
+    const contextCarriers=[], voteChannels=[];
+    const seen=new Set();
+    topFeats.forEach(f=>{
+        if(seen.has(f.id))return;seen.add(f.id);
+        const label=getFeatureLabel('33',f.id);
+        if(!label)return;
+        if(label.summary?.includes('context carrier'))contextCarriers.push({f,label});
+        else if(label.summary?.includes('prediction channel')||label.top_aas?.[0]?.enrichment>10)voteChannels.push({f,label});
+    });
+
+    const predAA=d.prediction.top5[0].aa;
+    let t=`The final layer. The model's answer is <em>${predAA}</em> (${AA_NAMES[predAA]}) at ${(d.prediction.top5[0].prob*100).toFixed(1)}% confidence. `;
+
+    if(contextCarriers.length>0){
+        t+=`The dominant features here are <strong>context carriers</strong> — massive, diffuse features active at ${contextCarriers[0].label.activation_rate?Math.round(contextCarriers[0].label.activation_rate*100):'90'}%+ of positions. `;
+        t+=`These carry the accumulated structural and evolutionary context that the final MLP layers read to compute the prediction. `;
+        t+=`They're not the answer — they're the <em>question</em> the model asks before deciding. `;
+    }
+
+    if(voteChannels.length>0){
+        t+=`Alongside them, the sharp prediction channels persist — `;
+        t+=voteChannels.slice(0,2).map(x=>`F${x.f.id} (${x.label.summary})`).join(', ');
+        t+=` — these are the actual votes that determine the output.`;
+    }
+
+    // MLP at L32 - usually the biggest
+    const mlp32=d.mlp_neurons?.['32'];
+    if(mlp32&&Math.abs(mlp32.total_answer_proj)>3){
+        t+=` The final MLP (layer 33) delivers a massive <em>${mlp32.total_answer_proj>0?'+':''}${mlp32.total_answer_proj.toFixed(1)}</em> push — this is logit-scale calibration, adjusting confidence rather than changing the answer.`;
+    }
+    return t;
+}
+
+// ═══════════════════════════════════════════
+// RACE STATE
+// ═══════════════════════════════════════════
+function computeRace(d){
+    const rp=d.running_predictions;if(!rp)return null;
+    const aas=Object.keys(rp),nL=rp[aas[0]].length,states=[];
+    for(let i=0;i<nL;i++){states.push(aas.map(aa=>({aa,prob:rp[aa][i]})).sort((a,b)=>b.prob-a.prob));}
+    return states;
+}
+
+function probAt(d,layerIdx){
+    const race=computeRace(d);if(!race)return null;
+    const idx=Math.min(layerIdx,race.length-1);
+    return race[idx];
+}
+
+// ═══════════════════════════════════════════
+// SOURCES
+// ═══════════════════════════════════════════
+function analyzeSourcesNarrative(d){
+    const contacts=d.annotations?.structural_contacts||[];
+    const coevol=d.annotations?.coevolving_positions||[];
+    const imp=d.source_importance;
+    const totalSum=imp.total.reduce((a,b)=>a+b,0);
+    const structSum=imp.structural.reduce((a,b)=>a+b,0);
+    const coevolSum=imp.coevolving.reduce((a,b)=>a+b,0);
+    const structPct=totalSum>0?structSum/totalSum*100:0;
+    const ranked=imp.total.map((v,i)=>({pos:i,total:v,struct:imp.structural[i]||0,coevol:imp.coevolving[i]||0}))
+        .filter(x=>x.pos!==d.position).sort((a,b)=>b.total-a.total).slice(0,12);
+    let narr=`This position has <em>${contacts.length} structural contacts</em> (residues within 8Å in 3D)`;
+    if(coevol.length>0)narr+=` and <em>${coevol.length} co-evolving positions</em>`;
+    narr+='. ';
+    if(structPct>60)narr+=`Structural context dominates attention (${structPct.toFixed(0)}% of total information flow).`;
+    else if(coevolSum/totalSum>.3)narr+=`Co-evolutionary signal is unusually strong (${(coevolSum/totalSum*100).toFixed(0)}% of flow).`;
+    else narr+=`Information flows from a mix of structural neighbors and sequence context.`;
+    const topSrc=ranked.slice(0,3);
+    if(topSrc.length>0){
+        narr+=` Top attention sources: `;
+        narr+=topSrc.map(s=>{
+            const aa=META.sequence[s.pos];
+            const label=contacts.includes(s.pos)?'structural':coevol.includes(s.pos)?'co-evolving':Math.abs(s.pos-d.position)<=5?'local':'distant';
+            return`<em>${aa}${s.pos+1}</em> (${label})`;
+        }).join(', ')+'.';
+    }
+    if(coevol.length>0&&coevolSum/totalSum<=.3){
+        const coevolPct=totalSum>0?(coevolSum/totalSum*100).toFixed(0):0;
+        narr+=` Co-evolving positions contribute ${coevolPct}% of total flow — shown separately below.`;
+    }
+    return{narr,ranked,contacts,coevol};
+}
+
+// ═══════════════════════════════════════════
+// PREDICTION NARRATIVE
+// ═══════════════════════════════════════════
+function predNarrative(d){
+    const topPred=d.prediction.top5[0];
+    const predAA=topPred.aa,predName=AA_NAMES[predAA],predProb=topPred.prob;
+    const correct=predAA===d.sequence_aa;
+    const race=computeRace(d);
+    let t=`ESM-2 predicts <em>${predAA}</em> (${predName}) at position ${d.position+1} with <em>${(predProb*100).toFixed(1)}%</em> confidence`;
+    if(!correct)t+=` — <strong>incorrectly</strong>, the true residue is <em>${d.sequence_aa}</em> (${AA_NAMES[d.sequence_aa]}, rank #${d.prediction.correct_rank})`;
+    const runner=d.prediction.top5[1];
+    if(runner?.prob>.05)t+=`, over <em>${runner.aa}</em> (${(runner.prob*100).toFixed(1)}%)`;
+    t+='. ';
+    if(race){
+        let leadChanges=[];
+        for(let i=1;i<race.length;i++){if(race[i][0].aa!==race[i-1][0].aa)leadChanges.push({layer:i,from:race[i-1][0].aa,to:race[i][0].aa});}
+        if(leadChanges.length>0){
+            t+=`The model changes its mind ${leadChanges.length} time${leadChanges.length>1?'s':''} — `;
+            if(leadChanges.length<=3)t+=leadChanges.map(lc=>`<em>${lc.from}→${lc.to}</em> at L${lc.layer}`).join(', ');
+            else t+=`first favoring <em>${leadChanges[0].from}</em>, finally settling on <em>${leadChanges[leadChanges.length-1].to}</em> at layer ${leadChanges[leadChanges.length-1].layer}`;
+            t+='. ';
+        }
+    }
+    return t;
+}
+
+// ═══════════════════════════════════════════
+// TRANSITION NARRATIVE
+// ═══════════════════════════════════════════
+function transitionNarr(d,fromL,toL){
+    const vel=d.velocity;
+    let attnSum=0,mlpSum=0,nOpp=0,events=[];
+    for(let i=fromL;i<=toL;i++){
+        attnSum+=vel.attention[i];mlpSum+=vel.mlp[i];
+        if(vel.attn_mlp_cosine[i]<-.3&&(Math.abs(vel.attention[i])>.2||Math.abs(vel.mlp[i])>.2))nOpp++;
+    }
+
+    const race=computeRace(d);
+    if(race){
+        for(let i=fromL+1;i<=toL+1&&i<race.length;i++){
+            if(race[i][0].aa!==race[i-1][0].aa)
+                events.push(`${race[i-1][0].aa}→${race[i][0].aa} at L${i}`);
+        }
+    }
+
+    let parts=[];
+    const nLayers=toL-fromL+1;
+    if(events.length>0)parts.push(events.join(', '));
+    else{
+        const dominant=Math.abs(mlpSum)>Math.abs(attnSum)*1.5?'MLP-driven':Math.abs(attnSum)>Math.abs(mlpSum)*1.5?'attention-driven':'balanced';
+        if(Math.abs(attnSum)+Math.abs(mlpSum)>.5)parts.push(dominant);
+        else parts.push('quiet');
+    }
+    if(nOpp>1)parts.push(`${nOpp} opposition layers`);
+    return parts.join(' · ')||`${nLayers} layers`;
+}
+
+// ═══════════════════════════════════════════
+// LAYER NARRATIVE (for expanded transitions)
+// ═══════════════════════════════════════════
+function layerNarr(d,l){
+    const a=d.velocity.attention[l],m=d.velocity.mlp[l];
+    const race=computeRace(d);
+    if(!race){
+        if(Math.abs(d.velocity.answer[l])<.15)return'Quiet';
+        return`${d.velocity.answer[l]>0?'+':''}${d.velocity.answer[l].toFixed(1)} toward ${AA_NAMES[d.sequence_aa]}`;
+    }
+    const before=race[l],after=race[Math.min(l+1,race.length-1)];
+    if(before[0].aa!==after[0].aa)return`${after[0].aa} overtakes ${before[0].aa} → ${(after[0].prob*100).toFixed(1)}%`;
+    const gain=after.find(s=>s.aa===after[0].aa).prob-before.find(s=>s.aa===before[0].aa).prob;
+    if(Math.abs(gain)<.005)return`${after[0].aa} holds at ${(after[0].prob*100).toFixed(0)}%`;
+    return`${after[0].aa} ${gain>0?'↑':'↓'} ${(after[0].prob*100).toFixed(1)}%`;
+}
+
+// ═══════════════════════════════════════════
+// HEAD NARRATIVE
+// ═══════════════════════════════════════════
+function headNarr(d,l,h){
+    const proj=d.per_head.answer_projection[l][h];
+    if(Math.abs(proj)<.08)return null;
+    const sA=d.per_head.attn_structural[l][h],cA=d.per_head.attn_coevolving[l][h],lA=d.per_head.attn_local[l][h];
+    const dir=proj>0?'promotes':'opposes';
+    let t=`<b>L${l+1}.H${h}</b> ${dir} prediction (${proj>0?'+':''}${proj.toFixed(2)})`;
+    const srcs=(d.head_attention_sources||{})[`${l}_${h}`]||[];
+    if(sA>.1){const ss=srcs.filter(s=>s.labels.includes('structural')).slice(0,2);
+        t+=ss.length?` — reads <span class="tag st">structural</span> contacts ${ss.map(s=>`${s.aa}${s.pos+1}`).join(', ')}`:` — <span class="tag st">structural</span>`;
+    }else if(cA>.1){t+=` — <span class="tag co">co-evolutionary</span>`;
+    }else if(lA>.15){const ls=srcs.filter(s=>s.labels.includes('local')).slice(0,2);
+        t+=` — <span class="tag lo">local</span>${ls.length?' from '+ls.map(s=>s.aa+(s.pos+1)).join(', '):''}`;
+    }else if(srcs.length){t+=` — attends to ${srcs.slice(0,2).map(s=>`${s.aa}${s.pos+1}`).join(', ')}`;}
+    return t;
+}
+
+// ═══════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════
+function renderAll(d){
+    const main=document.getElementById('main');main.innerHTML='';OPEN_CHAPTER=null;EXPLORER_SEL=null;
+
+    // 1. PREDICTION
+    const predSec=ce('div','pred');
+    predSec.innerHTML=`<div class="sec-label">Prediction</div>`+renderPredCard(d);
+    main.appendChild(predSec);
+    raf(()=>raf(()=>predSec.querySelectorAll('.pb-fill').forEach(f=>f.style.width=f.dataset.w)));
+
+    // 2. THE EQUATION
+    const eqSec=ce('div','equation-section');
+    eqSec.innerHTML=renderEquation(d);
+    main.appendChild(eqSec);
+    raf(()=>drawRaceChart(d));
+
+    // 3. SOURCES
+    const srcSec=ce('div','sources');
+    srcSec.innerHTML=renderSources(d);
+    main.appendChild(srcSec);
+
+    // 4. FULL LAYER EXPLORER (replaces old chapters)
+    const expSec=ce('div','explorer');
+    expSec.innerHTML=renderExplorer(d);
+    main.appendChild(expSec);
+    raf(()=>buildExplorerHeatmap(d));
+
+    // 5. SYNERGY
+    const synSec=ce('div','synergy-section');
+    synSec.innerHTML=renderSynergy(d);
+    main.appendChild(synSec);
+    raf(()=>drawSynergyChart(d));
+}
+
+function ce(tag,cls){const e=document.createElement(tag);e.className=cls;return e;}
+function raf(fn){requestAnimationFrame(()=>requestAnimationFrame(fn));}
+
+// ═══════════════════════════════════════════
+// THE EQUATION
+// ═══════════════════════════════════════════
+function renderEquation(d){
+    const vel=d.velocity;
+    if(!vel||!vel.answer)return'';
+
+    const narr=d.equation_narrative;
+    const predAA=d.prediction.top5[0].aa;
+    const correct=predAA===d.sequence_aa;
+
+    // ── If no narrative data, show fallback ──
+    if(!narr){
+        return renderEquationFallback(d);
+    }
+
+    let html=`<div class="sec-label">The Equation — Why ${correct?predAA:predAA+' (not '+d.sequence_aa+')'}?</div>`;
+    html+=`<div class="eq-card">`;
+
+    // Headline + story
+    html+=`<div class="eq-headline">${esc(narr.headline)}</div>`;
+    html+=`<div class="eq-story">${markupStory(narr.story)}</div>`;
+
+    // Perception phase (new schema) or Evidence phase (old schema)
+    const perc=narr.perception_phase||narr.evidence_phase;
+    if(perc){
+        html+=`<div class="eq-evidence">
+            <div class="eq-evidence-title">Layers 1–23: Perception — What the Model Sees</div>
+            <div class="eq-evidence-text">${markupPlain(perc.summary)}</div>`;
+        // context_character (new) or environment (old)
+        const env=perc.context_character||perc.environment;
+        if(env){
+            html+=`<div class="eq-evidence-env">${markupPlain(env)}</div>`;
+        }
+        // key_information_sources (new schema only)
+        if(perc.key_information_sources&&perc.key_information_sources.length>0){
+            html+=`<div class="eq-info-sources">`;
+            perc.key_information_sources.forEach(src=>{
+                html+=`<div class="eq-info-src">${markupPlain(src)}</div>`;
+            });
+            html+=`</div>`;
+        }
+        html+=`</div>`;
+    }
+
+    // Decision phase (new schema only)
+    if(narr.decision_phase){
+        html+=`<div class="eq-decision">
+            <div class="eq-decision-title">Layers 24–33: Decision — What the Model Chooses</div>
+            <div class="eq-decision-text">${markupPlain(narr.decision_phase.summary)}</div>`;
+        if(narr.decision_phase.transition){
+            html+=`<div class="eq-transition">${markupPlain(narr.decision_phase.transition)}</div>`;
+        }
+        html+=`</div>`;
+    }
+
+    // Race chart (using running_predictions)
+    html+=`<div class="eq-race">
+        <div class="eq-race-title">Probability Race — All 33 Layers</div>
+        <div class="eq-race-chart" id="eq-race-chart"></div>
+    </div>`;
+
+    // Candidates
+    if(narr.candidates&&narr.candidates.length>0){
+        html+=`<div class="eq-candidates">`;
+        html+=`<div class="eq-cand-title">The Contenders</div>`;
+        narr.candidates.forEach(cand=>{
+            const prob=d.prediction.all_aa_probs?.[cand.aa]||d.prediction.top5.find(x=>x.aa===cand.aa)?.prob||0;
+            const rp=d.running_predictions?.[cand.aa];
+
+            // Determine CSS class from role
+            let cls='contender';
+            let roleDisplay=cand.role.replace(/_/g,' ');
+            if(cand.role==='winner'&&correct)cls='winner';
+            else if(cand.role==='winner'&&!correct)cls='wrong-winner';
+            else if(cand.role==='correct_answer')cls='correct-answer';
+
+            html+=`<div class="eq-candidate ${cls}">
+                <div class="eq-cand-header">
+                    <div class="eq-cand-aa" style="color:${aaColor(cand.aa)}">${cand.aa}</div>
+                    <div class="eq-cand-info">
+                        <div class="eq-cand-name">${AA_NAMES[cand.aa]||cand.aa}</div>
+                        <div class="eq-cand-role">${roleDisplay}</div>
+                    </div>
+                    <div class="eq-cand-prob" style="color:${aaColor(cand.aa)}">${(prob*100).toFixed(1)}%</div>
+                </div>`;
+
+            // Mini trajectory sparkline
+            if(rp){
+                const mx=Math.max(...rp,0.01);
+                html+=`<div class="eq-cand-trajectory">`;
+                rp.forEach((p,i)=>{
+                    const h=Math.max(1,p/mx*28);
+                    const opacity=0.3+p/mx*0.7;
+                    html+=`<div class="eq-cand-tbar" style="height:${h}px;background:${aaColor(cand.aa)};opacity:${opacity.toFixed(2)}"></div>`;
+                });
+                html+=`</div>`;
+            }
+
+            // Narrative
+            if(cand.narrative){
+                html+=`<div class="eq-cand-narr">${markupPlain(cand.narrative)}</div>`;
+            }
+            if(cand.key_layers){
+                html+=`<div class="eq-cand-layers">${esc(cand.key_layers)}</div>`;
+            }
+
+            // Evidence chips
+            if(cand.key_evidence&&cand.key_evidence.length>0){
+                html+=`<div class="eq-cand-evidence">`;
+                cand.key_evidence.forEach(ev=>{
+                    html+=`<div class="eq-cand-ev-item">${esc(ev)}</div>`;
+                });
+                html+=`</div>`;
+            }
+
+            html+=`</div>`;
+        });
+        html+=`</div>`;
+    }
+
+    // Turning points
+    if(narr.turning_points&&narr.turning_points.length>0){
+        html+=`<div class="eq-turns">`;
+        narr.turning_points.forEach(tp=>{
+            html+=`<div class="eq-turn">
+                <div class="eq-turn-range">${esc(tp.layer_range)}</div>
+                <div class="eq-turn-text">${markupPlain(tp.description)}</div>
+            </div>`;
+        });
+        html+=`</div>`;
+    }
+
+    /* REMOVED: "Explore the Evidence" section — uncomment to restore
+    // Deep dives — use LLM-curated if available, otherwise auto-generate
+    const dives=narr.deep_dives?.length>0 ? narr.deep_dives : generateHeuristicDives(d);
+    ACTIVE_DIVES=dives;
+    if(dives.length>0){
+        html+=`<div class="eq-dives">`;
+        html+=`<div class="eq-dives-title">Explore the Evidence</div>`;
+        dives.forEach(dd=>{
+            const icon=dd.type==='mlp_layers'?'⚙':dd.type==='sae_features'?'◈':dd.type==='attention_heads'?'◎':'≋';
+            html+=`<div class="dd-card" id="dd-${esc(dd.id)}">
+                <div class="dd-header" onclick="toggleDeepDive('${esc(dd.id)}')">
+                    <div class="dd-icon">${icon}</div>
+                    <div class="dd-label">${esc(dd.label)}</div>
+                    <div class="dd-arrow">▶</div>
+                </div>
+                <div class="dd-body"><div class="dd-inner" id="dd-inner-${esc(dd.id)}"></div></div>
+            </div>`;
+        });
+        html+=`</div>`;
+    }
+    */
+
+    // Resolution
+    if(narr.resolution){
+        html+=`<div class="eq-resolution ${correct?'correct':'incorrect'}">
+            <div class="eq-resolution-title">${correct?'Why the model gets this right':'Where the model\'s reasoning diverges'}</div>
+            <div class="eq-resolution-text">${markupPlain(narr.resolution)}</div>
+        </div>`;
+    }
+
+    html+=`</div>`;
+    return html;
+}
+
+// ── Plain text → light markup (bold amino acids, numbers) ──
+function markupPlain(text){
+    if(!text)return'';
+    let s=esc(text);
+    // Layer refs first to avoid partial matches (L10 from L10-23)
+    s=s.replace(/\b(L\d+(?:-(?:L)?\d+)?)\b/g,'<em>$1</em>');
+    // Feature/neuron refs: F18:5372 (layer-qualified) or F5372 (legacy). Interactive, same as markupStory.
+    s=s.replace(/\b([FN])(?:(\d+):)?(\d+)\b/g,function(_,prefix,layer,id){
+        const layerAttr=layer?` data-layer="${layer}"`:'';
+        return`<span class="feature-ref" data-prefix="${prefix}"${layerAttr} data-fid="${id}"><strong>${prefix}${layer?layer+':':''}${id}</strong></span>`;
+    });
+    // AA+position refs (skip F, L, N — already handled)
+    s=s.replace(/\b([A-EG-KMO-Z])(\d+)\b/g,'<em>$1$2</em>');
+    s=s.replace(/(\d+\.?\d*%)/g,'<em>$1</em>');
+    return s;
+}
+
+// ── Story markup — interactive layer refs, residue refs, toned-down percentages ──
+function markupStory(text){
+    if(!text)return'';
+    let s=esc(text);
+    // Interactive layer references: L30, L27-30 → hoverable spans with dash unstyled
+    s=s.replace(/\b(L)(\d+)(?:-(L)?(\d+))?\b/g,function(_,_p,from,_p2,to){
+        if(to!==undefined){
+            return`<span class="layer-ref" data-from="${from}" data-to="${to}"><em>L${from}</em>\u2011<em>${to}</em></span>`;
+        }
+        return`<span class="layer-ref" data-from="${from}" data-to="${from}"><em>L${from}</em></span>`;
+    });
+    // Feature/neuron references: F18:5372 (layer-qualified) or F5372 (legacy). Must run before residue pattern.
+    s=s.replace(/\b([FN])(?:(\d+):)?(\d+)\b/g,function(_,prefix,layer,id){
+        const layerAttr=layer?` data-layer="${layer}"`:'';
+        return`<span class="feature-ref" data-prefix="${prefix}"${layerAttr} data-fid="${id}"><strong>${prefix}${layer?layer+':':''}${id}</strong></span>`;
+    });
+    // Interactive residue references: K27, D32 → hoverable, clickable spans (skip F, L, N — handled above)
+    s=s.replace(/\b([A-EG-KMO-Z])(\d+)\b/g,function(_,aa,num){
+        return`<span class="residue-ref" data-pos="${parseInt(num)-1}"><em>${aa}${num}</em></span>`;
+    });
+    // Percentages: toned down to bright white instead of accent blue
+    s=s.replace(/(\d+\.?\d*%)/g,'<span class="pct-ref">$1</span>');
+    return s;
+}
+
+function esc(t){
+    if(!t)return'';
+    return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Race chart (d3) ──
+function drawRaceChart(d){
+    const c=document.getElementById('eq-race-chart');
+    if(!c||!d.running_predictions)return;
+    const rp=d.running_predictions;
+    const predAA=d.prediction.top5[0].aa;
+
+    // Pick top candidates to show (by max probability reached)
+    const aas=Object.keys(rp);
+    const aaMax=aas.map(aa=>({aa,max:Math.max(...rp[aa]),final:rp[aa][rp[aa].length-1]}));
+    aaMax.sort((a,b)=>b.max-a.max);
+    const showAAs=aaMax.slice(0,5).map(x=>x.aa);
+    // Always include correct and predicted
+    if(!showAAs.includes(predAA))showAAs.push(predAA);
+    if(!showAAs.includes(d.sequence_aa))showAAs.push(d.sequence_aa);
+
+    const nL=rp[aas[0]].length;
+    const margin={top:12,right:60,bottom:28,left:36};
+    const W=c.clientWidth||860,H=160;
+    const w=W-margin.left-margin.right,h=H-margin.top-margin.bottom;
+
+    const svg=d3.select(c).append('svg').attr('width',W).attr('height',H);
+    const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+
+    const x=d3.scaleLinear().domain([0,nL-1]).range([0,w]);
+    const y=d3.scaleLinear().domain([0,Math.min(1,d3.max(showAAs,aa=>d3.max(rp[aa]))*1.15)]).range([h,0]);
+
+    // Grid
+    [0.25,0.5,0.75].forEach(v=>{
+        if(v>y.domain()[1])return;
+        g.append('line').attr('x1',0).attr('x2',w).attr('y1',y(v)).attr('y2',y(v))
+            .attr('stroke','rgba(148,163,184,0.06)').attr('stroke-dasharray','3,4');
+        g.append('text').attr('x',-6).attr('y',y(v)+3).attr('text-anchor','end')
+            .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(92,106,132,0.3)')
+            .text(Math.round(v*100)+'%');
+    });
+
+    // Layer markers for chapter boundaries
+    [0,8,17,23,29,32].forEach(l=>{
+        g.append('line').attr('x1',x(l)).attr('x2',x(l)).attr('y1',0).attr('y2',h)
+            .attr('stroke','rgba(56,189,248,0.06)').attr('stroke-dasharray','2,3');
+    });
+    for(let i=0;i<nL;i+=4){
+        g.append('text').attr('x',x(i)).attr('y',h+14).attr('text-anchor','middle')
+            .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(92,106,132,0.3)')
+            .text('L'+(i+1));
+    }
+
+    // Lines
+    const line=d3.line().x((_,i)=>x(i)).y(v=>y(v)).curve(d3.curveMonotoneX);
+
+    showAAs.forEach(aa=>{
+        const isMain=aa===predAA;
+        const isCorrect=aa===d.sequence_aa&&aa!==predAA;
+        const col=aaColor(aa);
+        const opacity=isMain?0.9:isCorrect?0.7:0.3;
+        const width=isMain?2.5:isCorrect?1.8:1;
+
+        g.append('path').datum(rp[aa]).attr('d',line)
+            .attr('fill','none').attr('stroke',col).attr('stroke-width',width).attr('opacity',opacity);
+
+        // Label at end
+        const finalY=y(rp[aa][nL-1]);
+        g.append('text').attr('x',w+4).attr('y',finalY+3)
+            .attr('font-family','var(--font-mono)').attr('font-size','9').attr('font-weight',isMain?'700':'400')
+            .attr('fill',col).attr('opacity',Math.max(opacity,0.5))
+            .text(aa+' '+(rp[aa][nL-1]*100).toFixed(0)+'%');
+    });
+
+    // Lead change markers
+    const race=computeRace(d);
+    if(race){
+        for(let i=1;i<race.length;i++){
+            if(race[i][0].aa!==race[i-1][0].aa){
+                g.append('circle').attr('cx',x(i)).attr('cy',y(race[i][0].prob))
+                    .attr('r',4).attr('fill','none').attr('stroke','rgba(251,191,36,0.6)').attr('stroke-width',1.5);
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════
+// HEURISTIC DEEP DIVE GENERATOR
+// ═══════════════════════════════════════════
+function generateHeuristicDives(d){
+    const dives=[];
+    const vel=d.velocity;
+    const predAA=d.prediction.top5[0].aa;
+    const race=computeRace(d);
+
+    // 1. Find the biggest MLP layers (by absolute total_answer_proj)
+    if(d.mlp_neurons){
+        const mlpLayers=Object.entries(d.mlp_neurons)
+            .map(([k,v])=>({key:k,layer:parseInt(k)+1,proj:v.total_answer_proj,nActive:v.n_active}))
+            .filter(x=>Math.abs(x.proj)>1.5)
+            .sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj));
+
+        if(mlpLayers.length>0){
+            // Find a cluster of impactful MLP layers
+            const top=mlpLayers[0];
+            const nearby=mlpLayers.filter(x=>Math.abs(parseInt(x.key)-parseInt(top.key))<=2).slice(0,3);
+            const keys=nearby.map(x=>x.key).sort((a,b)=>parseInt(a)-parseInt(b));
+            const layerNums=keys.map(k=>parseInt(k)+1);
+            const netSum=nearby.reduce((s,x)=>s+x.proj,0);
+            dives.push({
+                id:'mlp-hot',
+                label:`MLP neurons L${layerNums[0]}–${layerNums[layerNums.length-1]} (${netSum>0?'+':''}${netSum.toFixed(1)} net)`,
+                type:'mlp_layers',
+                layers:keys,
+                caption:`These MLP layers have the strongest total push ${netSum>0?'toward':'away from'} the predicted answer (${predAA}). Each neuron's "top votes" column shows which amino acids it promotes — look for neurons that specifically favor ${predAA}.`
+            });
+        }
+    }
+
+    // 2. Find SAE checkpoint with strongest AA-specific features
+    if(d.sae_features){
+        const checkpoints=['30','33','24'];
+        for(const lk of checkpoints){
+            const sae=d.sae_features[lk];
+            if(!sae)continue;
+            const all=[...(sae.attn_top_features||[]),...(sae.mlp_top_features||[])];
+            const specific=[];
+            const seen=new Set();
+            all.forEach(f=>{
+                if(seen.has(f.id))return;seen.add(f.id);
+                const label=getFeatureLabel(lk,f.id);
+                if(label?.top_aas?.[0]?.enrichment>5)specific.push({f,label,enrichment:label.top_aas[0].enrichment,aa:label.top_aas[0].aa});
+            });
+            if(specific.length>=2){
+                const topIds=specific.sort((a,b)=>b.enrichment-a.enrichment).slice(0,5).map(x=>x.f.id);
+                const layerNum=lk==='1'?1:lk==='9'?9:lk==='18'?18:lk==='24'?24:lk==='30'?30:33;
+                const predSpecific=specific.filter(x=>x.aa===predAA);
+                dives.push({
+                    id:'feat-L'+lk,
+                    label:`SAE features at L${layerNum} (${specific.length} AA-specific)`,
+                    type:'sae_features',
+                    layers:[lk],
+                    feature_ids:topIds,
+                    caption:`Layer ${layerNum} has ${specific.length} features with strong amino acid specificity (>5× enrichment). ${predSpecific.length>0?`${predSpecific.length} of these specifically encode ${predAA}.`:''} Highlighted features have the highest specificity scores.`
+                });
+                break; // one SAE dive is enough
+            }
+        }
+    }
+
+    // 3. Find layers with lead changes for velocity dive
+    if(vel&&race){
+        const changeIndices=[];
+        for(let i=1;i<race.length;i++){
+            if(race[i][0].aa!==race[i-1][0].aa)changeIndices.push(i);
+        }
+        if(changeIndices.length>0){
+            // Find the most dramatic change cluster
+            const lastChange=changeIndices[changeIndices.length-1];
+            const start=Math.max(0,lastChange-3);
+            const end=Math.min(32,lastChange+2);
+            const keys=[];
+            for(let i=start;i<=end;i++)keys.push(String(i));
+            dives.push({
+                id:'vel-changes',
+                label:`Velocity at L${start+1}–${end+1} (lead change${changeIndices.length>1?'s':''})`,
+                type:'velocity_range',
+                layers:keys,
+                caption:`The model changes its leading candidate ${changeIndices.length} time${changeIndices.length>1?'s':''}. This view shows the attention vs MLP contribution at each layer alongside the probability leader. Look for layers where one component overpowers the other.`
+            });
+        } else {
+            // No lead changes — show the biggest velocity region
+            let bestStart=0,bestSum=0;
+            for(let i=0;i<=vel.answer.length-4;i++){
+                const sum=Math.abs(vel.answer[i])+Math.abs(vel.answer[i+1])+Math.abs(vel.answer[i+2])+Math.abs(vel.answer[i+3]);
+                if(sum>bestSum){bestSum=sum;bestStart=i;}
+            }
+            const keys=[];
+            for(let i=bestStart;i<Math.min(bestStart+6,vel.answer.length);i++)keys.push(String(i));
+            dives.push({
+                id:'vel-active',
+                label:`Most active layers: L${bestStart+1}–${bestStart+keys.length}`,
+                type:'velocity_range',
+                layers:keys,
+                caption:`This is where the most happens — the largest logit-space changes in the model's processing. The attention column (cyan) and MLP column (purple) show each component's contribution.`
+            });
+        }
+    }
+
+    // 4. Find layers with strong structural/co-evolutionary attention heads
+    if(d.writing_events?.length>0){
+        const structHeads=d.writing_events.filter(e=>e.attn_structural>.1||e.attn_coevolving>.05);
+        const localHeads=d.writing_events.filter(e=>e.attn_local>.5);
+        const interesting=structHeads.length>0?structHeads:localHeads;
+        if(interesting.length>0){
+            const layerSet=new Set(interesting.slice(0,6).map(e=>String(e.layer)));
+            const layerKeys=[...layerSet].sort((a,b)=>parseInt(a)-parseInt(b));
+            const layerNums=layerKeys.map(k=>parseInt(k)+1);
+            const type=structHeads.length>0?'structural & co-evolutionary':'local sequence';
+            dives.push({
+                id:'attn-heads',
+                label:`Attention heads reading ${type} context`,
+                type:'attention_heads',
+                layers:layerKeys,
+                caption:`These attention heads read from ${type} sources and have significant projections onto the answer. Click any head to highlight which sequence positions it attends to in the bar above.`
+            });
+        }
+    }
+
+    return dives.slice(0,5);
+}
+
+// ── Fallback: minimal equation when no narrative is available ──
+function renderEquationFallback(d){
+    const predAA=d.prediction.top5[0].aa;
+    const correct=predAA===d.sequence_aa;
+    let html=`<div class="sec-label">The Equation — Why ${correct?predAA:predAA+' (not '+d.sequence_aa+')'}?</div>`;
+    html+=`<div class="eq-card">`;
+    html+=`<div class="eq-fallback">
+        Narrative not yet generated for this position.<br>
+        <span style="margin-top:8px;display:inline-block">Run <code>python generate_narratives.py --data-dir ./your_data --pos ${d.position}</code> to generate.</span>
+    </div>`;
+    html+=`<div class="eq-race">
+        <div class="eq-race-title">Probability Race — All 33 Layers</div>
+        <div class="eq-race-chart" id="eq-race-chart"></div>
+    </div>`;
+
+    /* REMOVED: "Explore the Evidence" section — uncomment to restore
+    // Still show heuristic deep dives even without narrative
+    const dives=generateHeuristicDives(d);
+    ACTIVE_DIVES=dives;
+    if(dives.length>0){
+        html+=`<div class="eq-dives">`;
+        html+=`<div class="eq-dives-title">Explore the Evidence</div>`;
+        dives.forEach(dd=>{
+            const icon=dd.type==='mlp_layers'?'⚙':dd.type==='sae_features'?'◈':dd.type==='attention_heads'?'◎':'≋';
+            html+=`<div class="dd-card" id="dd-${esc(dd.id)}">
+                <div class="dd-header" onclick="toggleDeepDive('${esc(dd.id)}')">
+                    <div class="dd-icon">${icon}</div>
+                    <div class="dd-label">${esc(dd.label)}</div>
+                    <div class="dd-arrow">▶</div>
+                </div>
+                <div class="dd-body"><div class="dd-inner" id="dd-inner-${esc(dd.id)}"></div></div>
+            </div>`;
+        });
+        html+=`</div>`;
+    }
+    */
+
+    html+=`</div>`;
+    return html;
+}
+
+// ═══════════════════════════════════════════
+// DEEP DIVE PANELS
+// ═══════════════════════════════════════════
+function toggleDeepDive(id){
+    const card=document.getElementById('dd-'+id);
+    if(!card)return;
+    const wasOpen=card.classList.contains('open');
+
+    // Close all other deep dives
+    document.querySelectorAll('.dd-card.open').forEach(c=>{
+        c.classList.remove('open');
+    });
+
+    if(wasOpen)return;
+
+    // Open this one and render its content
+    card.classList.add('open');
+    const inner=document.getElementById('dd-inner-'+id);
+    if(!inner||inner.dataset.rendered)return;
+
+    const dd=ACTIVE_DIVES.find(d=>d.id===id);
+    if(!dd)return;
+
+    inner.innerHTML=renderDeepDiveContent(dd,POS_DATA);
+    inner.dataset.rendered='1';
+}
+
+function renderDeepDiveContent(dd,d){
+    let html='';
+    if(dd.caption){
+        html+=`<div class="dd-caption">${markupPlain(dd.caption)}</div>`;
+    }
+
+    switch(dd.type){
+        case 'mlp_layers': html+=renderDDMlp(dd,d); break;
+        case 'sae_features': html+=renderDDFeatures(dd,d); break;
+        case 'attention_heads': html+=renderDDHeads(dd,d); break;
+        case 'velocity_range': html+=renderDDVelocity(dd,d); break;
+        default: html+=`<div style="color:var(--text-muted);font-style:italic">Unknown deep dive type: ${dd.type}</div>`;
+    }
+    return html;
+}
+
+// ── Deep dive: MLP layers ──
+function renderDDMlp(dd,d){
+    let html='';
+    const layers=dd.layers||[];
+    layers.forEach(lk=>{
+        const mlp=d.mlp_neurons?.[lk];
+        if(!mlp)return;
+        const layerNum=parseInt(lk)+1;
+        const netCls=mlp.total_answer_proj>0?'pos':'neg';
+        html+=`<div class="dd-mlp-layer">
+            <div class="dd-mlp-layer-head">
+                <div class="dd-mlp-layer-label">Layer ${layerNum}</div>
+                <div class="dd-mlp-layer-net ${netCls}">${mlp.total_answer_proj>0?'+':''}${mlp.total_answer_proj.toFixed(2)} net</div>
+                <div class="dd-mlp-layer-count">${mlp.n_active} active neurons</div>
+            </div>`;
+
+        // Writers
+        if(mlp.top_writers?.length>0){
+            html+=`<div style="font-family:var(--font-mono);font-size:.5rem;color:var(--writer);margin:4px 0 3px;letter-spacing:.08em">WRITERS (push toward answer)</div>`;
+            mlp.top_writers.slice(0,5).forEach(n=>{
+                html+=renderDDNeuron(n);
+            });
+        }
+        // Erasers
+        if(mlp.top_erasers?.length>0){
+            html+=`<div style="font-family:var(--font-mono);font-size:.5rem;color:var(--eraser);margin:8px 0 3px;letter-spacing:.08em">ERASERS (push away from answer)</div>`;
+            mlp.top_erasers.slice(0,3).forEach(n=>{
+                html+=renderDDNeuron(n);
+            });
+        }
+        html+=`</div>`;
+    });
+    return html;
+}
+
+function renderDDNeuron(n){
+    const cls=n.answer_proj>0?'pos':'neg';
+    let votes='';
+    (n.top_aa||[]).slice(0,5).forEach(([aa,proj])=>{
+        votes+=`<span class="dd-neuron-vote"><span class="aa" style="color:${aaColor(aa)}">${aa}</span>${proj.toFixed(2)}</span>`;
+    });
+    return`<div class="dd-neuron">
+        <div class="dd-neuron-id">N${n.neuron}</div>
+        <div class="dd-neuron-votes">${votes}</div>
+        <div class="dd-neuron-proj ${cls}">${n.answer_proj>0?'+':''}${n.answer_proj.toFixed(3)}</div>
+    </div>`;
+}
+
+// ── Deep dive: SAE features ──
+function renderDDFeatures(dd,d){
+    let html='';
+    const layers=dd.layers||[];
+    const highlightIds=new Set((dd.feature_ids||[]).map(String));
+
+    layers.forEach(lk=>{
+        const sae=d.sae_features?.[lk];
+        if(!sae)return;
+        const layerNum=lk==='1'?1:lk==='9'?9:lk==='18'?18:lk==='24'?24:lk==='30'?30:33;
+        html+=`<div style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-dim);margin:6px 0 4px;font-weight:600">Layer ${layerNum} SAE Features</div>`;
+
+        const attnSet=new Set((sae.attn_top_features||[]).map(f=>f.id));
+        const seen=new Set();
+        const all=[...(sae.attn_top_features||[]),...(sae.mlp_top_features||[])].filter(f=>{
+            if(seen.has(f.id))return false;
+            seen.add(f.id);return true;
+        }).sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj));
+
+        // If specific features are highlighted, show those first
+        const highlighted=all.filter(f=>highlightIds.has(String(f.id)));
+        const others=all.filter(f=>!highlightIds.has(String(f.id)));
+        const ordered=[...highlighted,...others].slice(0,10);
+
+        ordered.forEach(f=>{
+            const isHL=highlightIds.has(String(f.id));
+            const source=attnSet.has(f.id)?'attn':'mlp';
+            const label=getFeatureLabel(lk,f.id);
+            const summary=label?.summary||'unlabeled';
+            const topAA=label?.top_aas?.[0];
+            const projCls=f.proj>0?'pos':'neg';
+
+            let meta=source==='attn'?'attention':'MLP';
+            if(topAA&&topAA.enrichment>3)meta+=` · ${topAA.aa} ${topAA.enrichment.toFixed(0)}×`;
+            if(label?.activation_rate)meta+=` · ${(label.activation_rate*100).toFixed(0)}% activation`;
+
+            html+=`<div class="dd-feat ${isHL?'highlighted':''}">
+                <div class="dd-feat-pip ${source}"></div>
+                <div class="dd-feat-id">F${f.id}</div>
+                <div class="dd-feat-body">
+                    <div class="dd-feat-summary">${summary}</div>
+                    <div class="dd-feat-meta">${meta}</div>
+                </div>
+                <div class="dd-feat-proj ${projCls}">${f.proj>0?'+':''}${f.proj.toFixed(1)}</div>
+            </div>`;
+        });
+    });
+    return html;
+}
+
+// ── Deep dive: Attention heads ──
+function renderDDHeads(dd,d){
+    let html='';
+    const layers=dd.layers||[];
+
+    layers.forEach(lk=>{
+        const l=parseInt(lk);
+        const projs=d.per_head?.answer_projection?.[l];
+        if(!projs)return;
+        const layerNum=l+1;
+        html+=`<div style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-dim);margin:6px 0 4px;font-weight:600">Layer ${layerNum} Attention Heads</div>`;
+
+        // Find significant heads
+        const heads=projs.map((p,h)=>({head:h,proj:p,
+            structural:d.per_head.attn_structural?.[l]?.[h]||0,
+            coevol:d.per_head.attn_coevolving?.[l]?.[h]||0,
+            local:d.per_head.attn_local?.[l]?.[h]||0
+        })).filter(h=>Math.abs(h.proj)>.1).sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj)).slice(0,8);
+
+        heads.forEach(h=>{
+            const projCls=h.proj>0?'pos':'neg';
+            let typeCls='',typeLabel='';
+            if(h.structural>.1){typeCls='structural';typeLabel='structural';}
+            else if(h.coevol>.1){typeCls='coevol';typeLabel='co-evolutionary';}
+            else if(h.local>.15){typeCls='local';typeLabel='local';}
+
+            // Get source info
+            const srcs=(d.head_attention_sources||{})[`${l}_${h.head}`]||[];
+            let desc='';
+            if(srcs.length>0){
+                desc=srcs.slice(0,3).map(s=>{
+                    const lbl=s.labels?.includes('structural')?'structural':s.labels?.includes('coevolving')?'co-evol':'neighbor';
+                    return`${s.aa}${s.pos+1} (${lbl})`;
+                }).join(', ');
+            }
+
+            html+=`<div class="dd-head-row" onclick="focusHead(${l},${h.head})">
+                <div class="dd-head-id">L${layerNum}.H${h.head}</div>
+                ${typeLabel?`<div class="dd-head-type ${typeCls}">${typeLabel}</div>`:''}
+                <div class="dd-head-desc">${desc||'mixed attention'}</div>
+                <div class="dd-head-proj ${projCls}">${h.proj>0?'+':''}${h.proj.toFixed(2)}</div>
+            </div>`;
+        });
+    });
+    return html;
+}
+
+// ── Deep dive: Velocity range ──
+function renderDDVelocity(dd,d){
+    let html='';
+    const layers=dd.layers||[];
+    if(!d.velocity)return html;
+
+    const race=computeRace(d);
+    const maxVel=Math.max(
+        ...layers.map(lk=>Math.max(Math.abs(d.velocity.attention[parseInt(lk)]||0),Math.abs(d.velocity.mlp[parseInt(lk)]||0))),
+        0.1
+    );
+
+    html+=`<div class="dd-vel-chart">`;
+    html+=`<div style="display:grid;grid-template-columns:38px 1fr 1fr 60px;gap:4px;padding:0 8px 4px;margin-bottom:4px">
+        <div></div>
+        <div style="font-family:var(--font-mono);font-size:.46rem;color:var(--structural);text-align:center;letter-spacing:.06em">ATTENTION</div>
+        <div style="font-family:var(--font-mono);font-size:.46rem;color:var(--mlp-color);text-align:center;letter-spacing:.06em">MLP</div>
+        <div style="font-family:var(--font-mono);font-size:.46rem;color:var(--text-muted);text-align:right;letter-spacing:.06em">LEADER</div>
+    </div>`;
+
+    layers.forEach(lk=>{
+        const l=parseInt(lk);
+        const layerNum=l+1;
+        const attn=d.velocity.attention[l]||0;
+        const mlp=d.velocity.mlp[l]||0;
+        const attnPct=Math.abs(attn)/maxVel*100;
+        const mlpPct=Math.abs(mlp)/maxVel*100;
+        const attnCls=attn>0?'attn-pos':'attn-neg';
+        const mlpCls=mlp>0?'mlp-pos':'mlp-neg';
+
+        let leader='';
+        if(race&&race[Math.min(l+1,race.length-1)]){
+            const st=race[Math.min(l+1,race.length-1)];
+            leader=`${st[0].aa} ${(st[0].prob*100).toFixed(0)}%`;
+        }
+
+        html+=`<div class="dd-vel-row">
+            <div class="dd-vel-layer">L${layerNum}</div>
+            <div class="dd-vel-bar ${attnCls}" style="width:${Math.max(attnPct,4)}%">${attn.toFixed(1)}</div>
+            <div class="dd-vel-bar ${mlpCls}" style="width:${Math.max(mlpPct,4)}%">${mlp.toFixed(1)}</div>
+            <div class="dd-vel-race">${leader}</div>
+        </div>`;
+    });
+    html+=`</div>`;
+    return html;
+}
+
+// ── PRED CARD ──
+function renderPredCard(d){
+    const p=d.prediction,t5=p.top5,mx=t5[0].prob,predAA=t5[0].aa,correct=predAA===d.sequence_aa;
+    let bars='';
+    t5.forEach(item=>{const pct=item.prob/mx*100;const cls=item.aa===predAA?'top':'alt';
+        bars+=`<div class="pb-row"><div class="pb-aa" style="color:${aaColor(item.aa)}">${item.aa}${item.aa===d.sequence_aa&&!correct?'':''}</div><div class="pb-track"><div class="pb-fill ${cls}" style="width:0" data-w="${pct}%"></div></div><div class="pb-val">${(item.prob*100).toFixed(2)}%</div></div>`;});
+    let sub=`<div class="pred-prob">${(t5[0].prob*100).toFixed(1)}%</div><div class="pred-name">${AA_NAMES[predAA]}</div>`;
+    if(!correct)sub+=`<div class="pred-name" style="color:var(--eraser);font-style:normal;margin-top:6px;font-size:.68rem">true: ${d.sequence_aa}</div>`;
+    return`<div class="pred-card"><div class="pred-left"><div class="pred-aa" style="color:${aaColor(predAA)}">${predAA}</div>${sub}</div>
+        <div class="pred-right"><div class="pred-story">${predNarrative(d)}</div><div class="pred-bars">${bars}</div></div></div>`;
+}
+
+// ── SOURCES ──
+function renderSources(d){
+    const src=analyzeSourcesNarrative(d);
+    const top10=src.ranked.slice(0,10);
+    const top10Pos=new Set(top10.map(s=>s.pos));
+
+    const pos=d.position;
+    function srcCategory(p){
+        if(src.contacts.includes(p))return'structural';
+        if(src.coevol.includes(p))return'coevolving';
+        if(Math.abs(p-pos)<=5)return'local';
+        return'other';
+    }
+    const CAT_COLOR={'structural':'var(--structural)','coevolving':'var(--coevol)','local':'var(--local)','other':'var(--other)'};
+
+    function makeChip(s,forceLabel){
+        const aa=META.sequence[s.pos];
+        const cat=forceLabel||srcCategory(s.pos);
+        const col=CAT_COLOR[cat];
+        return`<div class="src-chip" style="border-color:${col}" onmouseenter="hlSrc([{pos:${s.pos},labels:['${cat}']}])" onmouseleave="updateSeqHL(POS_DATA)">
+            <span class="src-pos" style="color:${col}">${aa}${s.pos+1}</span><span class="src-wt">${s.total.toFixed(1)}</span></div>`;
+    }
+
+    let chips='';
+    top10.forEach(s=>{chips+=makeChip(s);});
+
+    // Always show co-evolving positions that aren't already in the top 10
+    const extraCoevol=src.coevol.filter(pos=>!top10Pos.has(pos));
+    let coevolChips='';
+    if(extraCoevol.length>0){
+        const coevolRanked=extraCoevol.map(p=>{
+            const imp=d.source_importance;
+            const mi=getMI(d.position,p);
+            return{pos:p,total:imp.total[p]||0,mi};
+        }).sort((a,b)=>(b.mi??-1)-(a.mi??-1));
+        coevolRanked.forEach(s=>{
+            const aa=META.sequence[s.pos];
+            const col=CAT_COLOR['coevolving'];
+            const miStr=s.mi!==null?`MI ${s.mi.toFixed(2)}`:'';
+            coevolChips+=`<div class="src-chip" style="border-color:${col}" onmouseenter="hlSrc([{pos:${s.pos},labels:['coevolving']}])" onmouseleave="updateSeqHL(POS_DATA)">
+                <span class="src-pos" style="color:${col}">${aa}${s.pos+1}</span>${miStr?`<span class="src-wt">${miStr}</span>`:`<span class="src-wt">${s.total.toFixed(1)}</span>`}</div>`;
+        });
+    }
+
+    let html=`<div class="sec-label">Where the Model Looks</div><div class="src-card"><div class="src-narrative">${src.narr}</div>
+        <div class="src-legend"><div class="src-legend-item"><div class="src-legend-dot" style="background:var(--structural)"></div>Structural (&lt;8Å)</div>
+        <div class="src-legend-item"><div class="src-legend-dot" style="background:var(--coevol)"></div>Co-evolving</div>
+        <div class="src-legend-item"><div class="src-legend-dot" style="background:var(--local)"></div>Local (\u00B15)</div>
+        <div class="src-legend-item"><div class="src-legend-dot" style="background:var(--other)"></div>Distant</div>
+        <span class="info-tip">i<span class="info-bubble"><strong>Structural</strong> residues are within 8\u00C5 in the 3D structure (PDB). <strong>Co-evolving</strong> positions mutate in a correlated way across species, implying functional coupling. <strong>Local</strong> residues are within \u00B15 positions in the primary sequence. <strong>Distant</strong> positions are none of the above.</span></span></div>
+        <div class="src-sub-label">Top attention sources <span class="info-tip">i<span class="info-bubble">Ranked by <em>importance</em>: the sum across all attention heads of |answer&nbsp;projection| \u00D7 attention&nbsp;weight. Higher values mean more answer-relevant information flows through that residue. Hover a chip to highlight it on the sequence bar.</span></span></div>
+        <div class="src-top-list">${chips}</div>`;
+
+    // ── All structural contacts ──
+    const allStruct=src.contacts.filter(p=>p!==d.position);
+    if(allStruct.length>0){
+        const structRanked=allStruct.map(p=>({pos:p,total:d.source_importance.total[p]||0}))
+            .sort((a,b)=>b.total-a.total);
+        let structChips='';
+        structRanked.forEach(s=>{
+            const aa=META.sequence[s.pos];
+            const col=CAT_COLOR['structural'];
+            structChips+=`<div class="src-chip" style="border-color:${col}" onmouseenter="hlSrc([{pos:${s.pos},labels:['structural']}])" onmouseleave="updateSeqHL(POS_DATA)">
+                <span class="src-pos" style="color:${col}">${aa}${s.pos+1}</span><span class="src-wt">${s.total.toFixed(1)}</span></div>`;
+        });
+        html+=`<div class="src-sub-label" style="margin-top:12px">Structural contacts <span class="info-tip">i<span class="info-bubble">All structural neighbors within 8\u00C5 in the PDB structure. The number is the importance score \u2014 higher values mean more answer-relevant information flows through that residue.</span></span></div>
+        <div class="src-top-list">${structChips}</div>`;
+    }
+
+    // ── Shared helper: ranked head section (collapsible) ──
+    function headRankSection(attnKey,color,label,tipText,collapseId){
+        const ph=d.per_head;
+        const nLayers=ph[attnKey].length;
+        const nHeads=ph[attnKey][0].length;
+        let rows=[];
+        for(let l=0;l<nLayers;l++){
+            for(let h=0;h<nHeads;h++){
+                const v=ph[attnKey][l][h];
+                if(v<0.01)continue;
+                rows.push({l,h,v,proj:ph.answer_projection[l][h]});
+            }
+        }
+        if(rows.length===0)return'';
+        rows.sort((a,b)=>b.v-a.v);
+        const mx=rows[0].v;
+        const shown=rows.slice(0,8);
+        let rowsHtml='';
+        shown.forEach(r=>{
+            const pct=(r.v*100).toFixed(1);
+            const barW=(r.v/mx*100).toFixed(1);
+            const opacity=(0.4+r.v/mx*0.6).toFixed(2);
+            const projCls=r.proj>0?'pos':'neg';
+            const projStr=(r.proj>0?'+':'')+r.proj.toFixed(2);
+            rowsHtml+=`<div class="attn-head-row" onmouseenter="focusHead(${r.l},${r.h})" onmouseleave="updateSeqHL(POS_DATA)" onclick="focusHead(${r.l},${r.h})">
+                <span class="ch-id">L${r.l+1}.H${r.h}</span>
+                <div class="ch-bar-track"><div class="ch-bar-fill" style="width:${barW}%;opacity:${opacity};background:${color}"></div></div>
+                <span class="ch-pct">${pct}%</span>
+                <span class="ch-proj ${projCls}">${projStr}</span></div>`;
+        });
+        return`<div class="src-collapse" id="${collapseId}">
+            <div class="src-collapse-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <span class="src-arrow">\u25B6</span>
+                <span class="src-sub-label" style="margin-bottom:0">${label} <span class="info-tip">i<span class="info-bubble">${tipText}</span></span></span>
+            </div>
+            <div class="src-collapse-body"><div class="attn-heads-list">${rowsHtml}</div></div></div>`;
+    }
+
+    // ── Structural heads (right below structural chips) ──
+    // if(src.contacts.length>0){
+    //     html+=headRankSection('attn_structural','var(--structural)',
+    //         'Heads attending to structural contacts',
+    //         'Ranked by the fraction of each head\u2019s attention landing on structural contacts (&lt;8\u00C5 in PDB). The bar shows relative strength; the percentage is the absolute share. The \u00B1 value is the head\u2019s answer projection \u2014 how much it pushes toward (+) or away from (\u2212) the final prediction. Click a row to highlight that head\u2019s sources on the sequence bar.',
+    //         'struct-heads-collapse');
+    // }
+
+    // ── Coevolving chips ──
+    if(coevolChips){
+        html+=`<div class="src-sub-label" style="margin-top:12px">Co-evolving positions <span class="info-tip">i<span class="info-bubble">Positions that co-evolve with the selected residue (MI+APC from Pfam MSA). Ranked by mutual information score \u2014 higher MI means stronger evolutionary coupling. These often don\u2019t rank among the top attention sources; they are shown separately so you can see whether the model attends to them at all.</span></span></div>
+        <div class="src-top-list">${coevolChips}</div>`;
+    }
+
+    // ── Coevolving heads (right below coevolving chips) ──
+    // if(src.coevol.length>0){
+    //     html+=headRankSection('attn_coevolving','var(--coevol)',
+    //         'Heads attending to co-evolving positions',
+    //         'Ranked by the fraction of each head\u2019s attention landing on co-evolving positions. The bar shows relative strength; the percentage is the absolute share. The \u00B1 value is the head\u2019s answer projection \u2014 how much it pushes toward (+) or away from (\u2212) the final prediction. Click a row to highlight that head\u2019s sources on the sequence bar.',
+    //         'coevol-heads-collapse');
+    // }
+
+    html+=`</div>`;
+    return html;
+}
+
+// ═══════════════════════════════════════════
+// FULL LAYER EXPLORER
+// ═══════════════════════════════════════════
+let EXPLORER_MODE='answer';
+let EXPLORER_SEL=null; // {type:'head',layer,head} or {type:'mlp',layer}
+
+const EXPLORER_MODES=[
+    {key:'answer',label:'Answer Projection',desc:'How much each head pushes toward (+) or against (−) the correct amino acid'},
+    {key:'structural',label:'Structural Attn',desc:'Fraction of attention on residues within 8Å in 3D'},
+    {key:'coevol',label:'Co-evolutionary',desc:'Fraction of attention on co-evolving positions'},
+    {key:'local',label:'Local Attn',desc:'Fraction of attention on ±5 residues in sequence'},
+    {key:'streams',label:'Stream Alignment',desc:'Cosine similarity to layer centroid — orthogonal heads appear dark',requiresData:'stream_analysis'},
+];
+
+function renderExplorer(d){
+    let html=`<div class="sec-label">Layer-by-Layer Explorer — Every Head & Neuron</div>`;
+    html+=`<div class="explorer-card">`;
+    // Controls
+    html+=`<div class="explorer-controls">`;
+    html+=`<span style="font-family:var(--font-mono);font-size:.48rem;color:var(--text-dim);letter-spacing:.08em;text-transform:uppercase;margin-right:4px">Attention Heads</span>`;
+    EXPLORER_MODES.forEach(m=>{
+        // Skip modes that require data we don't have
+        if(m.requiresData && !d[m.requiresData]) return;
+        html+=`<div class="explorer-tab${m.key===EXPLORER_MODE?' active':''}" data-mode="${m.key}" onclick="setExplorerMode('${m.key}')">${m.label}</div>`;
+    });
+    html+=`<span style="font-family:var(--font-mono);font-size:.44rem;color:var(--text-muted);margin-left:auto">Click any cell to inspect</span>`;
+    html+=`</div>`;
+    // Mode explanation banner (visible only for streams mode)
+    html+=`<div class="explorer-mode-banner${EXPLORER_MODE==='streams'?' visible':''}" id="explorer-mode-banner">
+        At each layer the attention heads form a dominant direction (the <em>centroid</em>).
+        Heads aligned with it contribute to the main computation;
+        heads that are <em>orthogonal</em> operate in an independent stream,
+        often carrying structural or co-evolutionary signal the majority ignores.</div>`;
+    // Heatmap container
+    html+=`<div class="explorer-body" id="explorer-heatmap"></div>`;
+    // Scale — dynamic based on mode
+    html+=`<div class="hm-scale" id="explorer-scale"><span>− erasing</span><div class="hm-scale-bar diverging"></div><span>writing +</span></div>`;
+    // Detail panel
+    html+=`<div id="explorer-detail"></div>`;
+    html+=`</div>`;
+    return html;
+}
+
+function setExplorerMode(mode){
+    EXPLORER_MODE=mode;
+    document.querySelectorAll('.explorer-tab').forEach(t=>{
+        t.classList.toggle('active',t.dataset.mode===mode);
+    });
+    // Show/hide mode explanation banner
+    const bannerEl=document.getElementById('explorer-mode-banner');
+    if(bannerEl) bannerEl.classList.toggle('visible',mode==='streams');
+    // Update scale label
+    const scaleEl=document.getElementById('explorer-scale');
+    if(scaleEl){
+        if(mode==='streams'){
+            scaleEl.innerHTML=`<span>orthogonal (0)</span><div class="hm-scale-bar" style="background:linear-gradient(90deg,rgba(148,163,184,.05),rgba(56,189,248,.85))"></div><span>aligned (1)</span>`;
+        } else if(mode==='answer'){
+            scaleEl.innerHTML=`<span>− erasing</span><div class="hm-scale-bar diverging"></div><span>writing +</span>`;
+        } else {
+            scaleEl.innerHTML=`<span>none</span><div class="hm-scale-bar" style="background:linear-gradient(90deg,rgba(148,163,184,.05),rgba(52,211,153,.85))"></div><span>high</span>`;
+        }
+    }
+    if(POS_DATA)buildExplorerHeatmap(POS_DATA);
+}
+
+function getExplorerMatrix(d,mode){
+    const ph=d.per_head;
+    switch(mode){
+        case 'answer': return ph.answer_projection;
+        case 'structural': return ph.attn_structural;
+        case 'coevol': return ph.attn_coevolving;
+        case 'local': return ph.attn_local;
+        case 'streams': return d.stream_analysis?.centroid_cosine || ph.answer_projection;
+        default: return ph.answer_projection;
+    }
+}
+
+function explorerCellColor(val,maxAbs,mode){
+    if(mode==='answer'){
+        const t=Math.min(Math.abs(val)/maxAbs,1);
+        if(val>0) return `rgba(45,212,160,${(.08+t*.82).toFixed(2)})`;
+        if(val<0) return `rgba(248,113,113,${(.08+t*.82).toFixed(2)})`;
+        return 'rgba(148,163,184,0.04)';
+    } else if(mode==='streams'){
+        // Cosine to centroid: 1 = fully aligned (bright blue), 0 = orthogonal (dark)
+        // Negative = anti-correlated (red tint)
+        if(val<0){
+            const t=Math.min(Math.abs(val),1);
+            return `rgba(248,113,113,${(.1+t*.7).toFixed(2)})`;
+        }
+        const t=Math.min(val,1);
+        return `rgba(56,189,248,${(.03+t*.82).toFixed(2)})`;
+    } else {
+        // For attention fractions (0-1), use single color ramp
+        const colors={structural:'34,211,238',coevol:'52,211,153',local:'251,191,36'};
+        const c=colors[mode]||'56,189,248';
+        const t=Math.min(val/Math.max(maxAbs,.01),1);
+        return `rgba(${c},${(.03+t*.87).toFixed(2)})`;
+    }
+}
+
+function buildExplorerHeatmap(d){
+    const container=document.getElementById('explorer-heatmap');
+    if(!container)return;
+    container.innerHTML='';
+
+    const matrix=getExplorerMatrix(d,EXPLORER_MODE);
+    const nLayers=matrix.length, nHeads=matrix[0].length;
+
+    // Compute max absolute value for color scaling
+    let maxAbs=0;
+    matrix.forEach(row=>row.forEach(v=>{if(Math.abs(v)>maxAbs)maxAbs=Math.abs(v);}));
+    if(maxAbs===0)maxAbs=1;
+
+    // MLP data
+    const mlpMax=Math.max(...Object.values(d.mlp_neurons||{}).map(m=>Math.abs(m?.total_answer_proj||0)),0.1);
+    const velMax=Math.max(...d.velocity.answer.map(Math.abs),1);
+
+    // Build DOM
+    // Layer labels
+    const labels=document.createElement('div');labels.className='hm-labels';
+    for(let l=0;l<nLayers;l++){
+        const lbl=document.createElement('div');lbl.className='hm-layer-label';
+        lbl.textContent=`L${l+1}`;
+        lbl.onclick=()=>selectExplorerMLP(l);
+        lbl.dataset.layer=l;
+        labels.appendChild(lbl);
+    }
+    container.appendChild(labels);
+
+    // Attention heatmap grid
+    const gridWrap=document.createElement('div');gridWrap.className='hm-grid-wrap';
+    // Head number row
+    const headLabels=document.createElement('div');headLabels.className='hm-head-labels';
+    for(let h=0;h<nHeads;h++){
+        const hn=document.createElement('div');hn.className='hm-head-num';hn.textContent=h;
+        headLabels.appendChild(hn);
+    }
+    gridWrap.appendChild(headLabels);
+
+    // Heatmap rows
+    for(let l=0;l<nLayers;l++){
+        const row=document.createElement('div');row.className='hm-row';
+        for(let h=0;h<nHeads;h++){
+            const cell=document.createElement('div');cell.className='hm-cell';
+            cell.style.background=explorerCellColor(matrix[l][h],maxAbs,EXPLORER_MODE);
+            cell.dataset.layer=l;cell.dataset.head=h;
+            cell.onclick=()=>selectExplorerHead(l,h);
+            cell.onmouseenter=(e)=>showHmTooltip(e,d,l,h);
+            cell.onmouseleave=hideHmTooltip;
+            row.appendChild(cell);
+        }
+        gridWrap.appendChild(row);
+    }
+    container.appendChild(gridWrap);
+
+    // ── MLP column (wide, prominent) ──
+    const mlpWrap=document.createElement('div');mlpWrap.className='hm-mlp-col';
+    const mlpHeader=document.createElement('div');mlpHeader.className='hm-mlp-col-header';
+    mlpHeader.textContent='MLP net contribution';
+    mlpWrap.appendChild(mlpHeader);
+
+    for(let l=0;l<nLayers;l++){
+        const row=document.createElement('div');row.className='hm-mlp-row';
+        row.dataset.layer=l;
+        row.onclick=()=>selectExplorerMLP(l);
+
+        // Bar area
+        const barArea=document.createElement('div');barArea.className='hm-mlp-bar-area';
+        const center=document.createElement('div');center.className='hm-mlp-center-line';
+        barArea.appendChild(center);
+
+        const md=d.mlp_neurons?.[String(l)];
+        const tot=md?.total_answer_proj||0;
+        if(Math.abs(tot)>=0.05){
+            const bar=document.createElement('div');
+            bar.className='hm-mlp-bar-v2 '+(tot>=0?'pos':'neg');
+            const pct=Math.min(Math.abs(tot)/mlpMax,1)*50;
+            bar.style.width=pct+'%';
+            barArea.appendChild(bar);
+        }
+        row.appendChild(barArea);
+
+        // Value label
+        const val=document.createElement('div');val.className='hm-mlp-val';
+        if(Math.abs(tot)<0.1){
+            val.textContent='—';val.classList.add('quiet');
+        } else {
+            val.textContent=(tot>0?'+':'')+tot.toFixed(1);
+            val.classList.add(tot>0?'pos':'neg');
+        }
+        row.appendChild(val);
+
+        mlpWrap.appendChild(row);
+    }
+    container.appendChild(mlpWrap);
+
+    // ── Velocity column ──
+    const velWrap=document.createElement('div');velWrap.className='hm-vel-col';
+    const velHeader=document.createElement('div');velHeader.className='hm-vel-col-header';
+    velHeader.textContent='Δ ans';
+    velWrap.appendChild(velHeader);
+    for(let l=0;l<nLayers;l++){
+        const cell=document.createElement('div');cell.className='hm-vel-cell';
+        const v=d.velocity.answer[l];
+        const t=Math.min(Math.abs(v)/velMax,1);
+        if(v>0.1) cell.style.background=`rgba(45,212,160,${(.1+t*.5).toFixed(2)})`;
+        else if(v<-0.1) cell.style.background=`rgba(248,113,113,${(.1+t*.5).toFixed(2)})`;
+        cell.textContent=v>0?'+'+v.toFixed(1):v.toFixed(1);
+        cell.style.color=v>0.1?'var(--writer)':v<-0.1?'var(--eraser)':'var(--text-muted)';
+        velWrap.appendChild(cell);
+    }
+    container.appendChild(velWrap);
+
+    // Restore selection highlight
+    if(EXPLORER_SEL){
+        if(EXPLORER_SEL.type==='head'){
+            const c=container.querySelector(`.hm-cell[data-layer="${EXPLORER_SEL.layer}"][data-head="${EXPLORER_SEL.head}"]`);
+            if(c)c.classList.add('sel');
+        } else if(EXPLORER_SEL.type==='mlp'){
+            const lbl=container.querySelector(`.hm-layer-label[data-layer="${EXPLORER_SEL.layer}"]`);
+            if(lbl)lbl.classList.add('sel');
+            const mrow=container.querySelector(`.hm-mlp-row[data-layer="${EXPLORER_SEL.layer}"]`);
+            if(mrow)mrow.classList.add('sel');
+        }
+    }
+
+    // Ensure tooltip exists
+    if(!document.getElementById('hm-tip')){
+        const tip=document.createElement('div');tip.id='hm-tip';tip.className='hm-tooltip';
+        document.body.appendChild(tip);
+    }
+}
+
+function showHmTooltip(e,d,l,h){
+    const tip=document.getElementById('hm-tip');if(!tip)return;
+    const proj=d.per_head.answer_projection[l][h];
+    const sA=d.per_head.attn_structural[l][h];
+    const cA=d.per_head.attn_coevolving[l][h];
+    const lA=d.per_head.attn_local[l][h];
+    const cls=proj>=0?'pos':'neg';
+    let html=`<div class="hmt-title">Layer ${l+1} · Head ${h}</div>`;
+    html+=`<div class="hmt-val ${cls}">Answer: ${proj>=0?'+':''}${proj.toFixed(3)}</div>`;
+    html+=`<div class="hmt-row">Structural: ${(sA*100).toFixed(1)}%</div>`;
+    html+=`<div class="hmt-row">Co-evol: ${(cA*100).toFixed(1)}%</div>`;
+    html+=`<div class="hmt-row">Local: ${(lA*100).toFixed(1)}%</div>`;
+    // Stream alignment if available
+    const sa=d.stream_analysis;
+    if(sa?.centroid_cosine){
+        const cc=sa.centroid_cosine[l][h];
+        const ccCls=cc<0.1?'style="color:var(--eraser);font-weight:600"':cc>0.6?'':'style="color:var(--text-muted)"';
+        html+=`<div class="hmt-row" ${ccCls}>Stream alignment: ${cc.toFixed(3)}${cc<0.1?' ⟂':''}</div>`;
+    }
+    tip.innerHTML=html;tip.style.display='block';
+    const rect=e.target.getBoundingClientRect();
+    tip.style.left=Math.min(rect.right+8,window.innerWidth-tip.offsetWidth-8)+'px';
+    tip.style.top=Math.max(8,rect.top-20)+'px';
+}
+function hideHmTooltip(){const tip=document.getElementById('hm-tip');if(tip)tip.style.display='none';}
+
+function selectExplorerHead(l,h){
+    EXPLORER_SEL={type:'head',layer:l,head:h};
+    // Highlight cell
+    document.querySelectorAll('.hm-cell.sel,.hm-layer-label.sel,.hm-mlp-row.sel').forEach(el=>el.classList.remove('sel'));
+    const cell=document.querySelector(`.hm-cell[data-layer="${l}"][data-head="${h}"]`);
+    if(cell)cell.classList.add('sel');
+    // Highlight sources on sequence bar
+    focusHead(l,h);
+    // Build detail panel
+    renderExplorerHeadDetail(POS_DATA,l,h);
+}
+
+function selectExplorerMLP(l){
+    EXPLORER_SEL={type:'mlp',layer:l};
+    document.querySelectorAll('.hm-cell.sel,.hm-layer-label.sel,.hm-mlp-row.sel').forEach(el=>el.classList.remove('sel'));
+    const lbl=document.querySelector(`.hm-layer-label[data-layer="${l}"]`);
+    if(lbl)lbl.classList.add('sel');
+    const row=document.querySelector(`.hm-mlp-row[data-layer="${l}"]`);
+    if(row)row.classList.add('sel');
+    hlSrc(null); // clear sequence bar highlights
+    renderExplorerMLPDetail(POS_DATA,l);
+}
+
+function closeExplorerDetail(){
+    EXPLORER_SEL=null;
+    document.querySelectorAll('.hm-cell.sel,.hm-layer-label.sel,.hm-mlp-row.sel').forEach(el=>el.classList.remove('sel'));
+    document.getElementById('explorer-detail').innerHTML='';
+    // Reset sequence bar
+    hlSrc(null);
+}
+
+// ── SAE Explorer Helpers ──
+function findMatchingSAELayer(d,l){
+    const saeKeys=Object.keys(d.sae_features||{});
+    return saeKeys.find(k=>parseInt(k)===(l+1))||null;
+}
+function nearestCheckpoints(layerNum){
+    const cps=[1,9,18,24,30,33];
+    const below=cps.filter(c=>c<=layerNum).pop();
+    const above=cps.find(c=>c>=layerNum);
+    if(below===above)return String(below);
+    if(!below)return String(above);
+    if(!above)return String(below);
+    return `${below} and ${above}`;
+}
+function renderSAEFeatureCards(features,layerKey,options){
+    const src=options?.source||null;
+    const max=options?.maxItems||10;
+    const items=features.slice(0,max);
+    if(items.length===0)return`<div style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-muted);padding:4px 0">No features above threshold</div>`;
+    let html='';
+    items.forEach(f=>{
+        const label=getFeatureLabel(layerKey,f.id);
+        const summary=label?.summary||'unlabeled';
+        const topAA=label?.top_aas?.[0];
+        const projCls=f.proj>0?'pos':'neg';
+        const source=f.source||src||'attn';
+        let meta=source==='mlp'?'MLP':source==='both'?'attention + MLP':'attention';
+        if(topAA&&topAA.enrichment>3)meta+=` · ${topAA.aa} ${topAA.enrichment.toFixed(0)}×`;
+        if(label?.activation_rate)meta+=` · ${(label.activation_rate*100).toFixed(0)}% act`;
+        html+=`<div class="dd-feat">
+            <div class="dd-feat-pip ${source==='mlp'?'mlp':'attn'}"></div>
+            <div class="dd-feat-id">F${layerKey}:${f.id}</div>
+            <div class="dd-feat-body">
+                <div class="dd-feat-summary">${esc(summary)}</div>
+                <div class="dd-feat-meta">${meta}</div>
+            </div>
+            <div class="dd-feat-proj ${projCls}">${f.proj>0?'+':''}${f.proj.toFixed(1)}</div>
+        </div>`;
+    });
+    return html;
+}
+
+function renderExplorerHeadDetail(d,l,h){
+    const det=document.getElementById('explorer-detail');if(!det)return;
+    const proj=d.per_head.answer_projection[l][h];
+    const sA=d.per_head.attn_structural[l][h];
+    const cA=d.per_head.attn_coevolving[l][h];
+    const lA=d.per_head.attn_local[l][h];
+    const otherA=Math.max(0,1-sA-cA-lA);
+    const srcs=(d.head_attention_sources||{})[`${l}_${h}`]||[];
+    const predAA=d.prediction.top5[0].aa;
+
+    let html=`<div class="exp-detail">`;
+    html+=`<div class="exp-detail-title">
+        <span style="color:${proj>=0?'var(--writer)':'var(--eraser)'}">Layer ${l+1} · Head ${h}</span>
+        <span style="font-weight:400;color:var(--text-dim)">Answer projection: ${proj>=0?'+':''}${proj.toFixed(3)}</span>
+        <div class="exp-close" onclick="closeExplorerDetail()">✕</div>
+    </div>`;
+
+    // Summary sentence
+    const absProj=Math.abs(proj);
+    let summary='';
+    if(absProj<0.1){
+        summary=`This head has <em>negligible impact</em> on the prediction at this position — its output is nearly orthogonal to the ${predAA} direction.`;
+    } else {
+        const action=proj>0?'writing toward':'erasing';
+        const strength=absProj>2?'very strongly':absProj>1?'strongly':absProj>0.5?'moderately':'slightly';
+        summary=`This head is <em>${strength} ${action}</em> ${predAA} (${AA_NAMES[predAA]}).`;
+        if(sA>0.15)summary+=` It reads heavily from <em>structural contacts</em> (${(sA*100).toFixed(0)}% of attention on 3D neighbors).`;
+        else if(cA>0.15)summary+=` It reads from <em>co-evolving positions</em> (${(cA*100).toFixed(0)}% of attention).`;
+        else if(lA>0.2)summary+=` It reads from <em>local sequence context</em> (${(lA*100).toFixed(0)}% of attention on ±5 residues).`;
+    }
+    html+=`<div class="exp-head-summary">${summary}</div>`;
+
+    // ── Stream analysis (if available) ──
+    const sa=d.stream_analysis;
+    if(sa?.centroid_cosine){
+        const cc=sa.centroid_cosine[l][h];
+        const profile=sa.cross_layer_profiles?.[String(h)];
+        const layerInfo=sa.layer_streams?.[String(l)];
+        const mag=sa.head_magnitudes?.[l]?.[h]||0;
+
+        // Stream membership badge
+        let streamBadge='';
+        if(layerInfo){
+            if(layerInfo.isolated_heads.includes(h)){
+                streamBadge=`<span style="background:rgba(248,113,113,.15);color:var(--eraser);padding:2px 8px;border-radius:10px;font-family:var(--font-mono);font-size:.5rem;font-weight:600">
+                    ⟂ Orthogonal stream</span>`;
+            } else if(layerInfo.main_heads.includes(h)){
+                streamBadge=`<span style="background:rgba(56,189,248,.12);color:var(--accent);padding:2px 8px;border-radius:10px;font-family:var(--font-mono);font-size:.5rem">
+                    Main stream</span>`;
+            }
+        }
+
+        html+=`<div class="exp-stream-section">`;
+        html+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">`;
+        html+=`<span class="exp-detail-section-title" style="margin:0">Stream Alignment</span>`;
+        html+=`<span style="font-family:var(--font-mono);font-size:.64rem;color:${cc<0.1?'var(--eraser)':cc<0.4?'var(--text-dim)':'var(--accent)'};font-weight:600">${cc.toFixed(3)}</span>`;
+        if(streamBadge)html+=streamBadge;
+        html+=`</div>`;
+
+        // Layer stream detail at this layer
+        if(layerInfo && layerInfo.isolated_heads.includes(h)){
+            html+=`<div style="font-family:var(--font-mono);font-size:.5rem;color:var(--text-dim);margin-bottom:6px">
+                Inter-stream cosine: <strong style="color:var(--text-bright)">${layerInfo.inter_stream_cosine.toFixed(4)}</strong>
+                · Isolated group: H${layerInfo.isolated_heads.join(', H')}
+                · Magnitude: ${layerInfo.isolated_magnitude.toFixed(1)} vs main ${layerInfo.main_magnitude.toFixed(1)}
+            </div>`;
+        }
+
+        // Cross-layer sparkline: shows this head's cosine to centroid at every layer
+        if(profile && profile.length>1){
+            const nL=profile.length;
+            const svgW=Math.min(420,nL*12);
+            const svgH=48;
+            const padL=28,padR=4,padT=4,padB=14;
+            const chartW=svgW-padL-padR, chartH=svgH-padT-padB;
+
+            // Y range: -0.5 to 1.0
+            const yMin=-0.5,yMax=1.0;
+            const toX=i=>padL+(i/(nL-1))*chartW;
+            const toY=v=>padT+((yMax-v)/(yMax-yMin))*chartH;
+
+            let svg=`<svg width="${svgW}" height="${svgH}" style="display:block;margin:2px 0">`;
+            // Zero line (orthogonal threshold)
+            svg+=`<line x1="${padL}" y1="${toY(0)}" x2="${svgW-padR}" y2="${toY(0)}" stroke="rgba(148,163,184,.2)" stroke-dasharray="2,2"/>`;
+            // 0.5 line
+            svg+=`<line x1="${padL}" y1="${toY(0.5)}" x2="${svgW-padR}" y2="${toY(0.5)}" stroke="rgba(148,163,184,.1)"/>`;
+            // Y labels
+            svg+=`<text x="${padL-3}" y="${toY(1)+3}" fill="var(--text-muted)" font-size="7" text-anchor="end" font-family="var(--font-mono)">1</text>`;
+            svg+=`<text x="${padL-3}" y="${toY(0)+3}" fill="var(--text-muted)" font-size="7" text-anchor="end" font-family="var(--font-mono)">0</text>`;
+            // Current layer marker
+            svg+=`<line x1="${toX(l)}" y1="${padT}" x2="${toX(l)}" y2="${svgH-padB}" stroke="var(--accent)" stroke-width="1.5" opacity=".4"/>`;
+            // Data line
+            let pathD='';
+            profile.forEach((v,i)=>{
+                const clamped=Math.max(yMin,Math.min(yMax,v));
+                pathD+=(i===0?'M':'L')+`${toX(i).toFixed(1)},${toY(clamped).toFixed(1)}`;
+            });
+            svg+=`<path d="${pathD}" fill="none" stroke="var(--accent)" stroke-width="1.5" stroke-linejoin="round"/>`;
+            // Dots at notable points
+            profile.forEach((v,i)=>{
+                if(i===l || v<0.1 || i===0 || i===nL-1){
+                    const clamped=Math.max(yMin,Math.min(yMax,v));
+                    const col=v<0?'var(--eraser)':v<0.1?'var(--eraser)':'var(--accent)';
+                    svg+=`<circle cx="${toX(i)}" cy="${toY(clamped)}" r="${i===l?3:2}" fill="${col}"/>`;
+                }
+            });
+            // X label
+            svg+=`<text x="${svgW/2}" y="${svgH-1}" fill="var(--text-muted)" font-size="7" text-anchor="middle" font-family="var(--font-mono)">Layer →</text>`;
+            svg+=`</svg>`;
+            html+=`<div style="font-family:var(--font-mono);font-size:.44rem;color:var(--text-muted);margin-bottom:2px">Cosine to centroid across all layers (current layer highlighted)</div>`;
+            html+=svg;
+        } else {
+            html+=`<div style="font-family:var(--font-mono);font-size:.48rem;color:var(--text-muted)">
+                Mag: ${mag.toFixed(1)} · This head stays aligned with the main stream across all layers.</div>`;
+        }
+        html+=`</div>`;
+    }
+
+    html+=`<div class="exp-detail-grid">`;
+
+    // Left: Attention breakdown + type chips
+    html+=`<div class="exp-detail-section">`;
+    html+=`<div class="exp-detail-section-title">Attention Breakdown</div>`;
+    html+=`<div class="exp-attn-breakdown">`;
+    if(sA>0.01)html+=`<div class="exp-attn-chip structural">structural ${(sA*100).toFixed(1)}%</div>`;
+    if(cA>0.01)html+=`<div class="exp-attn-chip coevol">co-evolutionary ${(cA*100).toFixed(1)}%</div>`;
+    if(lA>0.01)html+=`<div class="exp-attn-chip local">local ${(lA*100).toFixed(1)}%</div>`;
+    if(otherA>0.01)html+=`<div class="exp-attn-chip other">other ${(otherA*100).toFixed(1)}%</div>`;
+    html+=`</div>`;
+
+    // All 20 heads at this layer mini-summary
+    html+=`<div style="margin-top:12px"><div class="exp-detail-section-title">All Heads at Layer ${l+1}</div>`;
+    html+=`<div style="display:flex;flex-wrap:wrap;gap:2px">`;
+    const projs=d.per_head.answer_projection[l];
+    projs.forEach((p,hi)=>{
+        const t=Math.min(Math.abs(p)/(Math.max(...projs.map(Math.abs))||1),1);
+        let bg;
+        if(p>0.02)bg=`rgba(45,212,160,${(.08+t*.5).toFixed(2)})`;
+        else if(p<-0.02)bg=`rgba(248,113,113,${(.08+t*.5).toFixed(2)})`;
+        else bg='rgba(148,163,184,0.04)';
+        const sel=hi===h?'outline:2px solid var(--accent);z-index:1;':'';
+        html+=`<div style="width:28px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;
+            font-family:var(--font-mono);font-size:.52rem;cursor:pointer;background:${bg};color:${Math.abs(p)>0.3?'var(--text-bright)':'var(--text-muted)'};${sel}"
+            onclick="selectExplorerHead(${l},${hi})" title="H${hi}: ${p>=0?'+':''}${p.toFixed(2)}">${hi}</div>`;
+    });
+    html+=`</div></div>`;
+    html+=`</div>`;
+
+    // Right: Top attention sources
+    html+=`<div class="exp-detail-section">`;
+    html+=`<div class="exp-detail-section-title">Top Attention Sources</div>`;
+    if(srcs.length===0){
+        html+=`<div style="font-family:var(--font-serif);font-size:.72rem;color:var(--text-muted);padding:4px 0">
+            No significant attention sources recorded for this head.${absProj<0.3?' (below significance threshold)':''}</div>`;
+    } else {
+        srcs.forEach(s=>{
+            let labelColor='var(--text-dim)';
+            if(s.labels?.includes('structural'))labelColor='var(--structural)';
+            else if(s.labels?.includes('coevolving'))labelColor='var(--coevol)';
+            else if(s.labels?.includes('local'))labelColor='var(--local)';
+            const tags=s.labels?.map(lb=>{
+                const c=lb==='structural'?'structural':lb==='coevolving'?'coevol':lb==='local'?'local':'other';
+                return `<span class="exp-attn-chip ${c}" style="font-size:.44rem;padding:1px 5px">${lb}</span>`;
+            }).join('')||'';
+            html+=`<div class="exp-src-row" onclick="selectPos(${s.pos})">
+                <div class="exp-src-pos" style="color:${labelColor}">${s.pos+1}</div>
+                <div class="exp-src-aa" style="color:${aaColor(s.aa)}">${s.aa}</div>
+                <div style="flex:1;display:flex;gap:3px;align-items:center">${tags}</div>
+                <div class="exp-src-wt">${(s.weight*100).toFixed(1)}%</div>
+            </div>`;
+        });
+    }
+
+    html+=`</div>`; // close right column
+    html+=`</div>`; // close exp-detail-grid
+
+    // ── SAE Features (full-width below grid) ──
+    const matchingSAE=findMatchingSAELayer(d,l);
+    if(matchingSAE){
+        const sae=d.sae_features[matchingSAE];
+        html+=`<div style="margin-top:14px">`;
+
+        // Per-head SAE features
+        const hFeats=(sae.per_head_features||{})[String(h)];
+        if(hFeats&&(hFeats.writing?.length>0||hFeats.erasing?.length>0)){
+            html+=`<div class="exp-detail-section-title">Head ${h} SAE Features (Layer ${matchingSAE})</div>`;
+            html+=`<div class="exp-detail-grid">`;
+            html+=`<div class="exp-detail-section" style="border-color:rgba(45,212,160,.15)">`;
+            html+=`<div class="exp-detail-section-title" style="color:var(--writer)">Writing</div>`;
+            html+=renderSAEFeatureCards(hFeats.writing||[],matchingSAE,{source:'attn',maxItems:8});
+            html+=`</div>`;
+            html+=`<div class="exp-detail-section" style="border-color:rgba(248,113,113,.15)">`;
+            html+=`<div class="exp-detail-section-title" style="color:var(--eraser)">Erasing</div>`;
+            html+=renderSAEFeatureCards(hFeats.erasing||[],matchingSAE,{source:'attn',maxItems:5});
+            html+=`</div>`;
+            html+=`</div>`;
+        } else {
+            html+=`<div style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-muted);padding:4px 0;margin-bottom:8px">No per-head SAE decomposition for this head (below writing threshold).</div>`;
+        }
+
+        // Layer-level merged features
+        const attnSet=new Set((sae.attn_top_features||[]).map(f=>f.id));
+        const seen=new Set();
+        const merged=[...(sae.attn_top_features||[]),...(sae.mlp_top_features||[])].filter(f=>{
+            if(seen.has(f.id))return false;seen.add(f.id);return true;
+        }).map(f=>({...f,source:attnSet.has(f.id)?'attn':'mlp'})).sort((a,b)=>Math.abs(b.proj)-Math.abs(a.proj));
+        const writers=merged.filter(f=>f.proj>0);
+        const erasers=merged.filter(f=>f.proj<0);
+
+        if(writers.length>0||erasers.length>0){
+            html+=`<div style="margin-top:12px"><div class="exp-detail-section-title">Layer ${matchingSAE} SAE Features</div>`;
+            html+=`<div class="exp-detail-grid">`;
+            html+=`<div class="exp-detail-section" style="border-color:rgba(45,212,160,.15)">`;
+            html+=`<div class="exp-detail-section-title" style="color:var(--writer)">Top Writers</div>`;
+            html+=renderSAEFeatureCards(writers,matchingSAE,{maxItems:8});
+            html+=`</div>`;
+            html+=`<div class="exp-detail-section" style="border-color:rgba(248,113,113,.15)">`;
+            html+=`<div class="exp-detail-section-title" style="color:var(--eraser)">Top Erasers</div>`;
+            html+=renderSAEFeatureCards(erasers,matchingSAE,{maxItems:8});
+            html+=`</div>`;
+            html+=`</div></div>`;
+        }
+
+        html+=`</div>`;
+    } else {
+        html+=`<div style="margin-top:14px;font-family:var(--font-serif);font-size:.68rem;color:var(--text-muted);padding:6px 0;line-height:1.5">
+            SAE feature data available at checkpoint layers: <strong style="color:var(--text-dim)">1, 9, 18, 24, 30, 33</strong>.
+            Nearest to layer ${l+1}: ${nearestCheckpoints(l+1)}.</div>`;
+    }
+
+    html+=`</div>`; // close exp-detail
+    det.innerHTML=html;
+}
+
+function renderExplorerMLPDetail(d,l){
+    const det=document.getElementById('explorer-detail');if(!det)return;
+    const md=d.mlp_neurons?.[String(l)];
+    const attnV=d.velocity.attention[l]||0;
+    const mlpV=d.velocity.mlp[l]||0;
+    const answerV=d.velocity.answer[l]||0;
+    const predAA=d.prediction.top5[0].aa;
+
+    let html=`<div class="exp-detail">`;
+    html+=`<div class="exp-detail-title">
+        <span>Layer ${l+1} — MLP & Velocity</span>
+        <div class="exp-close" onclick="closeExplorerDetail()">✕</div>
+    </div>`;
+
+    if(!md){
+        html+=`<div style="font-family:var(--font-serif);font-size:.78rem;color:var(--text-muted);padding:8px 0">No MLP neuron data available for this layer.</div>`;
+        html+=`</div>`;
+        det.innerHTML=html;
+        return;
+    }
+
+    // MLP headline
+    const tot=md.total_answer_proj;
+    const cls=Math.abs(tot)<0.2?'quiet':tot>0?'pos':'neg';
+    html+=`<div class="exp-mlp-headline">
+        <div class="exp-mlp-net ${cls}">${Math.abs(tot)<0.2?'≈ 0':((tot>0?'+':'')+tot.toFixed(2))}</div>`;
+    const mlpDim=META?.hidden_dim?META.hidden_dim*4:5120;
+    html+=`<div class="exp-mlp-meta">${md.n_active} active neurons of ${mlpDim} · Attn velocity: ${attnV>=0?'+':''}${attnV.toFixed(2)} · MLP velocity: ${mlpV>=0?'+':''}${mlpV.toFixed(2)}</div>
+    </div>`;
+
+    html+=`<div class="exp-detail-grid">`;
+
+    // Writers
+    html+=`<div class="exp-detail-section" style="border-color:rgba(45,212,160,.15)">`;
+    html+=`<div class="exp-detail-section-title" style="color:var(--writer)">Top Writers (push toward ${predAA})</div>`;
+    if(md.top_writers?.length>0){
+        md.top_writers.forEach(n=>{
+            const votes=n.top_aa.slice(0,5).map(([aa,v])=>`<span style="color:${aaColor(aa)}">${aa}${v>=0?'+':''}${v.toFixed(2)}</span>`).join('');
+            html+=`<div class="exp-neuron-row">
+                <div class="exp-neuron-id">N${n.neuron}</div>
+                <div class="exp-neuron-proj pos">+${n.answer_proj.toFixed(3)}</div>
+                <div class="exp-neuron-votes">${votes}</div>
+            </div>`;
+        });
+    } else {
+        html+=`<div style="font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted)">—</div>`;
+    }
+    html+=`</div>`;
+
+    // Erasers
+    html+=`<div class="exp-detail-section" style="border-color:rgba(248,113,113,.15)">`;
+    html+=`<div class="exp-detail-section-title" style="color:var(--eraser)">Top Erasers (push away from ${predAA})</div>`;
+    if(md.top_erasers?.length>0){
+        md.top_erasers.forEach(n=>{
+            const votes=n.top_aa.slice(0,5).map(([aa,v])=>`<span style="color:${aaColor(aa)}">${aa}${v>=0?'+':''}${v.toFixed(2)}</span>`).join('');
+            html+=`<div class="exp-neuron-row">
+                <div class="exp-neuron-id">N${n.neuron}</div>
+                <div class="exp-neuron-proj neg">${n.answer_proj.toFixed(3)}</div>
+                <div class="exp-neuron-votes">${votes}</div>
+            </div>`;
+        });
+    } else {
+        html+=`<div style="font-family:var(--font-mono);font-size:.58rem;color:var(--text-muted)">—</div>`;
+    }
+    html+=`</div>`;
+
+    html+=`</div>`; // close exp-detail-grid
+
+    // ── SAE Features ──
+    const matchingSAE=findMatchingSAELayer(d,l);
+    if(matchingSAE){
+        const sae=d.sae_features[matchingSAE];
+        html+=`<div style="margin-top:14px">`;
+        html+=`<div class="exp-detail-section-title">SAE Features at Layer ${matchingSAE}</div>`;
+
+        // MLP pathway features
+        const mlpFeats=(sae.mlp_top_features||[]).map(f=>({...f,source:'mlp'}));
+        html+=`<div style="margin-bottom:8px"><div style="font-family:var(--font-mono);font-size:.44rem;color:var(--mlp-color);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">MLP Pathway</div>`;
+        html+=renderSAEFeatureCards(mlpFeats,matchingSAE,{source:'mlp',maxItems:8});
+        html+=`</div>`;
+
+        // Attention pathway features
+        const attnFeats=(sae.attn_top_features||[]).map(f=>({...f,source:'attn'}));
+        html+=`<div style="margin-bottom:4px"><div style="font-family:var(--font-mono);font-size:.44rem;color:var(--structural);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Attention Pathway</div>`;
+        html+=renderSAEFeatureCards(attnFeats,matchingSAE,{source:'attn',maxItems:5});
+        html+=`</div>`;
+
+        html+=`</div>`;
+    } else {
+        html+=`<div style="margin-top:14px;font-family:var(--font-serif);font-size:.68rem;color:var(--text-muted);padding:6px 0;line-height:1.5">
+            SAE feature data available at checkpoint layers: <strong style="color:var(--text-dim)">1, 9, 18, 24, 30, 33</strong>.
+            Nearest to layer ${l+1}: ${nearestCheckpoints(l+1)}.</div>`;
+    }
+
+    html+=`</div>`; // close exp-detail
+    det.innerHTML=html;
+}
+
+// ── CHAPTERS ──
+function renderChapters(d){
+    let html='';
+    CHAPTERS.forEach((ch,ci)=>{
+        const race=computeRace(d);
+        const state=race?race[Math.min(ch.layer,race.length-1)]:null;
+        const leader=state?state[0]:null;
+        let probHtml='';
+        if(leader)probHtml=`<em style="color:${aaColor(leader.aa)}">${leader.aa}</em> ${(leader.prob*100).toFixed(1)}%`;
+
+        const subtitle=ch.storyFn(d).replace(/<[^>]+>/g,'').slice(0,100)+'…';
+
+        html+=`<div class="chapter" id="ch-${ci}">
+            <div class="ch-header" onclick="toggleChapter(${ci})">
+                <div class="ch-num" style="background:${ch.color}22;color:${ch.color}">${ci+1}</div>
+                <div class="ch-title-area">
+                    <div class="ch-title">Layer ${ch.layer}: ${ch.title}</div>
+                    <div class="ch-subtitle">${subtitle}</div>
+                </div>
+                <div class="ch-prob">${probHtml}</div>
+                <div class="ch-arrow">▶</div>
+            </div>
+            <div class="ch-body" id="chbody-${ci}"></div>
+        </div>`;
+
+        // Transition after this chapter
+        const tr=TRANSITIONS.find(t=>t.after_ch===ci);
+        if(tr){
+            const trNarr=transitionNarr(d,tr.from,tr.to);
+            html+=`<div class="transition" onclick="toggleTransition(${tr.from},${tr.to},this)">
+                <div class="tr-layers">L${tr.from+1}–${tr.to+1}</div>
+                <div class="tr-summary">${trNarr}</div>
+            </div>
+            <div class="tr-detail" id="tr-${tr.from}-${tr.to}"></div>`;
+        }
+    });
+    return html;
+}
+
+function toggleChapter(ci){
+    const body=document.getElementById(`chbody-${ci}`);
+    const header=body.previousElementSibling;
+    if(OPEN_CHAPTER!==null&&OPEN_CHAPTER!==ci){
+        const ob=document.getElementById(`chbody-${OPEN_CHAPTER}`);
+        ob.classList.remove('open');ob.innerHTML='';
+        ob.previousElementSibling.classList.remove('open');
+    }
+    if(OPEN_CHAPTER===ci){body.classList.remove('open');body.innerHTML='';header.classList.remove('open');OPEN_CHAPTER=null;return;}
+    OPEN_CHAPTER=ci;
+    header.classList.add('open');
+    body.innerHTML=`<div class="ch-inner">${buildChapterBody(POS_DATA,ci)}</div>`;
+    body.classList.add('open');
+}
+
+function toggleChaptersSection(){
+    const inner=document.getElementById('chapters-inner');
+    const arrow=document.querySelector('.ch-toggle-arrow');
+    if(!inner)return;
+    if(inner.style.display==='none'){
+        inner.style.display='block';
+        inner.innerHTML=renderChapters(POS_DATA);
+        if(arrow)arrow.style.transform='rotate(90deg)';
+    } else {
+        inner.style.display='none';
+        inner.innerHTML='';
+        OPEN_CHAPTER=null;
+        if(arrow)arrow.style.transform='';
+    }
+}
+
+function buildChapterBody(d,ci){
+    const ch=CHAPTERS[ci];
+    const sae=d.sae_features?.[ch.key];
+    let html=`<div class="ch-narr">${ch.storyFn(d)}</div>`;
+
+    if(!sae)return html+'<div style="color:var(--text-muted);font-style:italic">No SAE data at this layer.</div>';
+
+    // ── Collect features with source info ──
+    const attnSet=new Set((sae.attn_top_features||[]).map(f=>f.id));
+    const mlpSet=new Set((sae.mlp_top_features||[]).map(f=>f.id));
+    const attnMap=Object.fromEntries((sae.attn_top_features||[]).map(f=>[f.id,f]));
+    const mlpMap=Object.fromEntries((sae.mlp_top_features||[]).map(f=>[f.id,f]));
+    const allFeats=[];
+    const seen=new Set();
+    [...(sae.attn_top_features||[]),...(sae.mlp_top_features||[])].forEach(f=>{
+        if(!seen.has(f.id)){
+            seen.add(f.id);
+            const aProj=attnMap[f.id]?.proj||0;
+            const mProj=mlpMap[f.id]?.proj||0;
+            allFeats.push({...f, attnProj:aProj, mlpProj:mProj,
+                source:attnSet.has(f.id)&&mlpSet.has(f.id)?'both':attnSet.has(f.id)?'attn':'mlp'});
+        }
+    });
+
+    const writers=allFeats.filter(f=>f.proj>0).sort((a,b)=>b.proj-a.proj);
+    const erasers=allFeats.filter(f=>f.proj<0).sort((a,b)=>a.proj-b.proj);
+
+    // ── Layer-specific rendering ──
+    if(ch.key==='1') html+=renderIdentityLayer(d,writers,erasers);
+    else if(ch.key==='30') html+=renderPredictionLayer(d,writers,erasers,sae);
+    else html+=renderStandardLayer(d,ch,writers,erasers);
+
+    // ── KEY HEADS (narrative-first) ──
+    const l=ch.layer-1;
+    const projs=d.per_head.answer_projection[l];
+    if(projs) html+=renderKeyHeads(d,l,projs,ch);
+
+    // ── MLP SECTION ──
+    const md=d.mlp_neurons?.[String(l)];
+    if(md) html+=renderMLPSection(d,md,l,ch);
+
+    // ── VELOCITY INSIGHT ──
+    html+=renderVelocityInsight(d,ch,writers,erasers);
+
+    return html;
+}
+
+// ── FEATURE ROW RENDERER ──
+function renderFeatureRow(f){
+    const label=getFeatureLabel(String(f._layerKey||f.layerKey||''),f.id);
+    const summary=label?.summary||'unlabeled';
+    const srcCls=f.source==='both'?'both':f.source==='attn'?'attn':'mlp';
+    const srcTag=f.source==='both'
+        ?'<span class="feat-source-tag attn">attn</span><span class="feat-source-tag mlp">mlp</span>'
+        :f.source==='attn'?'<span class="feat-source-tag attn">attention</span>'
+        :'<span class="feat-source-tag mlp">MLP</span>';
+    const topAA=label?.top_aas?.[0];
+    let aaTag='';
+    if(topAA&&topAA.enrichment>5)aaTag=`<span class="feat-aa-vote" style="background:${aaColor(topAA.aa)}18;color:${aaColor(topAA.aa)}">${topAA.aa} ${topAA.enrichment.toFixed(0)}×</span>`;
+
+    const projCls=f.proj>0?'pos':'neg';
+    return`<div class="feat-row-v2">
+        <div class="feat-source-pip ${srcCls}"></div>
+        <div class="feat-id-v2">F${f.id}</div>
+        <div class="feat-body">
+            <div class="feat-summary-v2">${summary}</div>
+            <div class="feat-meta">${srcTag}${aaTag}</div>
+        </div>
+        <div class="feat-proj-v2 ${projCls}">${f.proj>0?'+':''}${f.proj.toFixed(1)}</div>
+    </div>`;
+}
+
+// ── LAYER 1: IDENTITY ──
+function renderIdentityLayer(d,writers,erasers){
+    const aa=d.sequence_aa;
+    const group=AA_GROUPS[aa]||'unknown';
+    const chem=AA_CHEMISTRY[aa]||{};
+    const props=[];
+    if(chem.hydrophobic)props.push('hydrophobic');
+    if(chem.polar)props.push('polar');
+    if(chem.charged&&chem.positive)props.push('positive charge');
+    if(chem.charged&&chem.negative)props.push('negative charge');
+    if(chem.aromatic)props.push('aromatic ring');
+    if(chem.aliphatic)props.push('aliphatic');
+    if(chem.branched)props.push('β-branched');
+    if(chem.bulky)props.push('bulky side chain');
+    if(chem.small)props.push('small');
+    if(chem.flexible)props.push('backbone flexibility');
+    if(chem.rigid)props.push('rigid (helix breaker)');
+    if(chem.disulfide)props.push('can form disulfide bonds');
+    if(chem.sulfur)props.push('contains sulfur');
+    if(chem.hbond)props.push('hydrogen bond donor/acceptor');
+
+    let html=`<div class="identity-card">
+        <div class="identity-aa" style="color:${aaColor(aa)}">${aa}</div>
+        <div style="flex:1">
+            <div style="font-family:var(--font-serif);font-size:.88rem;color:var(--text-bright);margin-bottom:6px">${AA_NAMES[aa]||aa} — the neighboring residues the model sees</div>
+            <div class="identity-props">${props.map(p=>`<div class="identity-prop">${p}</div>`).join('')}</div>
+        </div>
+    </div>`;
+
+    // Filter: only show features with real amino acid specificity, not context carriers
+    const meaningful=writers.filter(f=>{
+        const label=getFeatureLabel('1',f.id);
+        if(!label)return false;
+        // Skip context carriers (high activation rate, low interpretability)
+        if(label.activation_rate>.5&&label.interpretability<.4)return false;
+        // Keep AA-specific features
+        if(label.top_aas?.[0]?.enrichment>3)return true;
+        // Keep features with clear structural/functional labels
+        if(label.dominant_ss||label.terminal_bias)return true;
+        // Keep features with reasonable interpretability
+        if(label.interpretability>.5)return true;
+        return false;
+    });
+
+    if(meaningful.length>0){
+        html+=`<div class="feat-section"><div class="feat-label">Amino Acid Identity Features</div>
+            <div style="font-family:var(--font-serif);font-size:.72rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
+            These features encode the specific amino acid types surrounding the masked position — the model's raw alphabet before any structural context.</div>
+            <div class="feat-grid">`;
+        meaningful.slice(0,5).forEach(f=>{f._layerKey='1';html+=renderFeatureRow(f);});
+        html+=`</div></div>`;
+    } else {
+        html+=`<div style="font-family:var(--font-serif);font-size:.76rem;color:var(--text-muted);padding:12px 0;line-height:1.6">
+            At this early layer, the representation is dominated by <em style="color:var(--accent)">context carriers</em> —
+            diffuse features active across most positions. The specific amino acid identity is encoded
+            in the raw embedding vector, not yet in specialized SAE features.</div>`;
+    }
+    return html;
+}
+
+// ── LAYER 30: PREDICTION / VOTING ──
+function renderPredictionLayer(d,writers,erasers,sae){
+    let html='';
+
+    // Group features by which AA they vote for
+    const voteMap={};
+    const contextCarriers=[];
+    const allF=[...writers,...erasers];
+    allF.forEach(f=>{
+        const label=getFeatureLabel('30',f.id);
+        if(!label)return;
+        if(label.summary?.includes('context carrier')){contextCarriers.push(f);return;}
+        const topAA=label.top_aas?.[0];
+        if(topAA&&topAA.enrichment>5){
+            if(!voteMap[topAA.aa])voteMap[topAA.aa]={aa:topAA.aa,features:[],totalProj:0};
+            voteMap[topAA.aa].features.push({f,label,enrichment:topAA.enrichment});
+            voteMap[topAA.aa].totalProj+=f.proj;
+        }
+    });
+
+    const sortedVotes=Object.values(voteMap).sort((a,b)=>Math.abs(b.totalProj)-Math.abs(a.totalProj));
+    const maxVote=Math.max(...sortedVotes.map(v=>Math.abs(v.totalProj)),1);
+
+    if(sortedVotes.length>0){
+        html+=`<div class="vote-tally"><div class="feat-label">Prediction Votes — Features Grouped by Amino Acid</div>`;
+        sortedVotes.slice(0,6).forEach(v=>{
+            const pct=Math.abs(v.totalProj)/maxVote*100;
+            const col=aaColor(v.aa);
+            const dir=v.totalProj>0?'promotes':'suppresses';
+            html+=`<div class="vote-group">
+                <div class="vote-aa-header">
+                    <div class="vote-aa-letter" style="color:${col}">${v.aa}</div>
+                    <div class="vote-aa-name">${AA_NAMES[v.aa]||v.aa} — ${v.features.length} feature${v.features.length>1?'s':''} ${dir}</div>
+                    <div class="vote-aa-bar"><div class="vote-aa-fill" style="width:${pct}%;background:${col}"></div></div>
+                    <div class="vote-aa-pct">${v.totalProj>0?'+':''}${v.totalProj.toFixed(1)}</div>
+                </div>
+                <div class="vote-features">${v.features.map(vf=>
+                    `<div class="vote-feat-chip" title="${vf.label.summary||''}">F${vf.f.id} <span style="color:${vf.f.source==='mlp'?'var(--mlp-color)':'var(--structural)'}">${vf.f.source}</span> ${vf.f.proj>0?'+':''}${vf.f.proj.toFixed(1)}</div>`
+                ).join('')}</div>
+            </div>`;
+        });
+        html+=`</div>`;
+    }
+
+    // Context carriers separately
+    if(contextCarriers.length>0){
+        html+=`<div class="feat-section"><div class="feat-label">Context Carriers — The Question, Not the Answer</div>
+            <div style="font-family:var(--font-serif);font-size:.74rem;color:var(--text-muted);margin-bottom:8px;line-height:1.5">
+            These diffuse features are active at most positions. They carry accumulated structural and evolutionary context that the prediction channels read from.</div>
+            <div class="feat-grid">`;
+        contextCarriers.slice(0,4).forEach(f=>{f._layerKey='30';html+=renderFeatureRow(f);});
+        html+=`</div></div>`;
+    }
+
+    // Any remaining features not captured above
+    const capturedIds=new Set([...sortedVotes.flatMap(v=>v.features.map(vf=>vf.f.id)),...contextCarriers.map(f=>f.id)]);
+    const remaining=allF.filter(f=>!capturedIds.has(f.id)).slice(0,4);
+    if(remaining.length>0){
+        html+=`<div class="feat-section"><div class="feat-label">Other Active Features</div><div class="feat-grid">`;
+        remaining.forEach(f=>{f._layerKey='30';html+=renderFeatureRow(f);});
+        html+=`</div></div>`;
+    }
+
+    return html;
+}
+
+// ── STANDARD LAYER (9, 18, 24, 33): WRITE/ERASE SPLIT ──
+function renderStandardLayer(d,ch,writers,erasers){
+    const lk=ch.key;
+    let html='';
+
+    // Compute what's happening at this layer
+    const l=ch.layer-1;
+    const attnMag=Math.abs(d.velocity.attention[l]||0);
+    const mlpMag=Math.abs(d.velocity.mlp[l]||0);
+    const dominant=mlpMag>attnMag*1.5?'MLP':attnMag>mlpMag*1.5?'Attention':'balanced';
+
+    // Layer-specific descriptions
+    let writerDesc,eraserDesc;
+    if(lk==='9'){
+        writerDesc=dominant==='Attention'
+            ?'Context features arriving via attention — structural neighbors and co-evolutionary partners are writing into this position:'
+            :'New contextual features emerging — the model is enriching raw identity with structural environment:';
+        eraserDesc='Earlier features being cleared — the model is replacing generic identity with position-specific context:';
+    } else if(lk==='18'){
+        writerDesc='Abstract biological features — combining multiple chemical and structural properties into richer representations:';
+        eraserDesc='Simpler features from earlier layers being retired — no longer needed now that higher-level features exist:';
+    } else if(lk==='24'){
+        writerDesc='Integrated features — structural and co-evolutionary information merging into unified representations:';
+        eraserDesc='Stream-specific features being cleared as the separate information channels merge:';
+    } else if(lk==='33'){
+        writerDesc=dominant==='MLP'
+            ?'Final MLP push — stored knowledge translating accumulated context into the output distribution:'
+            :'Final representation shaping — the last adjustments before the prediction:';
+        eraserDesc='Penultimate features being overwritten — the model is committing to its final answer:';
+    } else {
+        writerDesc='Features being added to the representation at this layer:';
+        eraserDesc='Features being removed from the representation:';
+    }
+
+    // Filter out context carriers from display unless they're the only thing
+    const filterContextCarriers=(feats)=>{
+        const meaningful=feats.filter(f=>{
+            const label=getFeatureLabel(lk,f.id);
+            if(!label)return true; // show unlabeled — might be interesting
+            if(label.activation_rate>.5&&label.interpretability<.4)return false;
+            return true;
+        });
+        return meaningful.length>0?meaningful:feats.slice(0,2); // fallback to show something
+    };
+
+    const filteredWriters=filterContextCarriers(writers);
+    const filteredErasers=filterContextCarriers(erasers);
+
+    html+=`<div class="dynamics-split">`;
+
+    // WRITERS column
+    html+=`<div class="dynamics-col writers">
+        <div class="dynamics-col-head">
+            <div class="dynamics-col-icon w">↑</div>
+            <div class="dynamics-col-title">Writing</div>
+        </div>
+        <div class="dynamics-col-desc">${writerDesc}</div>`;
+    filteredWriters.slice(0,5).forEach(f=>{f._layerKey=lk;html+=renderFeatureRow(f);});
+    if(filteredWriters.length===0)html+=`<div style="font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);padding:8px 0">—</div>`;
+    html+=`</div>`;
+
+    // ERASERS column
+    html+=`<div class="dynamics-col erasers">
+        <div class="dynamics-col-head">
+            <div class="dynamics-col-icon e">↓</div>
+            <div class="dynamics-col-title">Erasing</div>
+        </div>
+        <div class="dynamics-col-desc">${eraserDesc}</div>`;
+    filteredErasers.slice(0,5).forEach(f=>{f._layerKey=lk;html+=renderFeatureRow(f);});
+    if(filteredErasers.length===0)html+=`<div style="font-family:var(--font-mono);font-size:.6rem;color:var(--text-muted);padding:8px 0">—</div>`;
+    html+=`</div>`;
+
+    html+=`</div>`;
+    return html;
+}
+
+// ── KEY HEADS: Biology-first narratives ──
+function renderKeyHeads(d,l,projs,ch){
+    const threshold=Math.max(...projs.map(Math.abs))*.15;
+    const significant=projs.map((p,h)=>({h,p})).filter(x=>Math.abs(x.p)>threshold).sort((a,b)=>Math.abs(b.p)-Math.abs(a.p));
+    const minor=projs.map((p,h)=>({h,p})).filter(x=>Math.abs(x.p)<=threshold);
+
+    let html=`<div class="key-heads"><div class="feat-label">Key Attention Heads at Layer ${ch.layer}</div>`;
+
+    if(significant.length===0){
+        html+=`<div style="font-family:var(--font-serif);font-size:.76rem;color:var(--text-muted);padding:6px 0">No attention heads with significant contributions at this layer.</div>`;
+    } else {
+        significant.slice(0,5).forEach(({h,p})=>{
+            const bio=bioHeadNarrative(d,l,h,p);
+            const projCls=p>0?'pos':'neg';
+
+            // Build the card content
+            let roleHtml='';
+            if(bio&&bio.sourceDesc){
+                roleHtml=`<div class="key-head-role">${bio.sourceDesc}</div>`;
+                if(bio.explanation){
+                    roleHtml+=`<div style="font-family:var(--font-serif);font-size:.72rem;color:var(--text-dim);margin-top:4px;line-height:1.55">${bio.explanation}</div>`;
+                }
+            } else {
+                // Fallback for heads without clear source data
+                const sA=d.per_head.attn_structural[l][h];
+                const cA=d.per_head.attn_coevolving[l][h];
+                const lA=d.per_head.attn_local[l][h];
+                if(Math.abs(p)>1){
+                    roleHtml=`<div class="key-head-role">${p>0?'Reinforces':'Counteracts'} the current prediction (${p>0?'+':''}${p.toFixed(2)} projection)</div>`;
+                } else {
+                    roleHtml=`<div class="key-head-role">Minor contribution (${p>0?'+':''}${p.toFixed(2)})</div>`;
+                }
+            }
+
+            // Source type tags
+            const sA=d.per_head.attn_structural[l][h];
+            const cA=d.per_head.attn_coevolving[l][h];
+            const lA=d.per_head.attn_local[l][h];
+            let tags='';
+            if(sA>.1)tags+='<span class="tag st">structural</span>';
+            if(cA>.1)tags+='<span class="tag co">co-evolutionary</span>';
+            if(lA>.15)tags+='<span class="tag lo">local</span>';
+
+            html+=`<div class="key-head-card" onclick="event.stopPropagation();focusHead(${l},${h})">
+                <div class="key-head-badge ${projCls}">L${l+1}.H${h}</div>
+                <div class="key-head-info">
+                    ${roleHtml}
+                    ${tags?`<div class="key-head-detail">${tags}</div>`:''}
+                </div>
+                <div class="key-head-proj ${projCls}">${p>0?'+':''}${p.toFixed(2)}</div>
+            </div>`;
+        });
+    }
+
+    // Minor heads as a collapsible row
+    if(minor.length>0){
+        const id=`minor-${l}`;
+        html+=`<div class="minor-heads" onclick="const g=document.getElementById('${id}');g.classList.toggle('open');this.querySelector('.mc').textContent=g.classList.contains('open')?'▾':'▸'">
+            <span class="mc">▸</span> ${minor.length} other heads (near-zero contribution)
+            <div class="minor-heads-grid" id="${id}">`;
+        minor.forEach(({h,p})=>{
+            const int=Math.min(Math.abs(p)/(threshold||.1),1);
+            let bg;if(p>.02)bg=`rgba(45,212,160,${int*.3})`;else if(p<-.02)bg=`rgba(248,113,113,${int*.3})`;else bg='rgba(148,163,184,0.04)';
+            html+=`<div class="hcell" style="background:${bg};color:var(--text-muted)" onclick="event.stopPropagation();focusHead(${l},${h})" title="H${h}: ${p>0?'+':''}${p.toFixed(2)}">H${h}</div>`;
+        });
+        html+=`</div></div>`;
+    }
+
+    html+=`</div>`;
+    return html;
+}
+
+// ── MLP SECTION (redesigned) ──
+function renderMLPSection(d,md,l,ch){
+    const tot=md.total_answer_proj,nA=md.n_active;
+    let html=`<div class="mlp-section-v2"><div class="feat-label">MLP Neurons</div>`;
+
+    // Headline
+    let role='';
+    if(Math.abs(tot)<.2){
+        html+=`<div class="mlp-headline"><div class="mlp-net quiet">≈ 0</div><div class="mlp-role">MLP is quiet at this layer — ${nA} active neurons, negligible net effect</div></div>`;
+    } else {
+        const topW=md.top_writers?.[0];
+        const voteAA=topW?.top_aa?.[0]?.[0];
+        if(ch.key==='30'||ch.key==='33'){
+            role=voteAA?`voting for <em>${voteAA}</em> (${AA_NAMES[voteAA]}) — knowledge injection`:'injecting stored knowledge';
+        } else if(parseInt(ch.key)<=9){
+            role='early-layer adjustment';
+        } else {
+            role=tot>0?'reinforcing the current prediction':'pushing against the current prediction';
+        }
+        const cls=tot>0?'pos':tot<0?'neg':'quiet';
+        html+=`<div class="mlp-headline"><div class="mlp-net ${cls}">${tot>0?'+':''}${tot.toFixed(2)}</div><div class="mlp-role">${role}</div></div>`;
+    }
+
+    // Neuron rows
+    const neurons=[...(md.top_writers||[]).slice(0,3),...(md.top_erasers||[]).slice(0,2)];
+    if(neurons.length>0&&Math.abs(tot)>=.2){
+        neurons.forEach(n=>{
+            const votes=n.top_aa.slice(0,4).map(([aa,v])=>`<span style="color:${aaColor(aa)}">${aa}${v>0?'+':''}${v.toFixed(1)}</span>`).join('');
+            const pc=n.answer_proj>0?'pos':'neg';
+            html+=`<div class="nrow"><div class="nid">N${n.neuron}</div><div class="nproj ${pc}">${n.answer_proj>0?'+':''}${n.answer_proj.toFixed(2)}</div><div class="nvotes">${votes}</div></div>`;
+        });
+    }
+    html+=`</div>`;
+    return html;
+}
+
+// ── VELOCITY INSIGHT CALLOUT ──
+function renderVelocityInsight(d,ch,writers,erasers){
+    const l=ch.layer-1;
+    const attnV=d.velocity.attention[l]||0;
+    const mlpV=d.velocity.mlp[l]||0;
+    const cosine=d.velocity.attn_mlp_cosine?.[l];
+    const predAA=d.prediction.top5[0].aa;
+
+    let msg='';
+    if(ch.key==='1'){
+        msg=`<strong>What velocity reveals:</strong> Standard analysis shows which features are active here. Velocity shows this layer is <em>constructing</em> the model's initial representation from scratch — transforming the raw token embedding into an internal vocabulary of amino acid properties and sequence context.`;
+    } else if(ch.key==='9'){
+        const contacts=d.annotations?.structural_contacts||[];
+        const coevol=d.annotations?.coevolving_positions||[];
+        if(cosine!==undefined&&cosine<-.2){
+            msg=`<strong>Velocity insight:</strong> Attention and MLP are <em>opposing</em> each other at this layer (cosine similarity ${cosine.toFixed(2)}). Attention is pulling in structural context from ${contacts.length} nearby residues in 3D, while MLP gates what gets through — not all structural information is equally relevant for predicting ${predAA} (${AA_NAMES[predAA]}) here.`;
+        } else {
+            msg=`<strong>Velocity insight:</strong> This layer is actively <em>rewriting</em> the representation — ${writers.length} features written, ${erasers.length} erased. The model is replacing "what amino acids are my neighbors?" with "what is the structural and chemical environment at this position?"`;
+        }
+    } else if(ch.key==='18'){
+        msg=`<strong>Velocity insight:</strong> Features being erased here were useful scaffolding in earlier layers. The model has extracted what it needs — secondary structure propensity, burial depth, local chemistry — and is now <em>clearing the workspace</em>. This "erasure is computation" principle is invisible without velocity tracking.`;
+    } else if(ch.key==='24'){
+        msg=`<strong>Velocity insight:</strong> At layer 9, structural information (3D contacts) and co-evolutionary information (evolutionary coupling) flowed through <em>geometrically orthogonal streams</em> — they literally couldn't interfere. Here at layer 24, those streams are <em>merging</em>. The model now has a unified picture: "what is physically near me" combined with "what has evolution constrained to be here."`;
+    } else if(ch.key==='30'){
+        const mlpDom=Math.abs(mlpV)>Math.abs(attnV)*1.5;
+        msg=mlpDom
+            ?`<strong>Velocity insight:</strong> MLP dominates this layer (${Math.abs(mlpV).toFixed(1)} vs attention ${Math.abs(attnV).toFixed(1)}). The prediction channels are being <em>injected from memorized knowledge</em> in the MLP weights — the model has learned amino acid statistics from millions of protein sequences and is now applying them: "given this burial/charge/structure environment, which amino acids belong here?"`
+            :`<strong>Velocity insight:</strong> The prediction channels are being actively written here. Each one encodes a specific amino acid preference — this is the model's <em>voting mechanism</em>, where accumulated structural and evolutionary context gets translated into concrete amino acid predictions.`;
+    } else if(ch.key==='33'){
+        msg=`<strong>Velocity insight:</strong> The final layer delivers the largest velocity in the entire network. This is <em>calibration</em> — adjusting the confidence of the prediction, not changing which amino acid wins. The decision was made in layers 24–30; this layer fine-tunes "how sure am I that it's ${predAA}?"`;
+    }
+
+    if(!msg)return'';
+    return`<div class="velocity-insight"><div class="velocity-insight-text">${msg}</div></div>`;
+}
+
+function toggleTransition(fromL,toL,el){
+    const det=document.getElementById(`tr-${fromL}-${toL}`);
+    if(det.classList.contains('open')){det.classList.remove('open');det.innerHTML='';return;}
+    let html=`<div class="tr-detail-inner">`;
+    const d=POS_DATA,velMax=Math.max(...d.velocity.attention.map(Math.abs),...d.velocity.mlp.map(Math.abs),1);
+    for(let l=fromL;l<=toL;l++){
+        html+=`<div class="tr-lrow">
+            <div class="lnum">L${l+1}</div>
+            <div class="tr-vel-cell" id="trv-a-${l}"></div>
+            <div class="tr-vel-cell" id="trv-m-${l}"></div>
+            <div style="width:20px"></div>
+            <div class="tr-hint">${layerNarr(d,l)}</div>
+        </div>`;
+    }
+    html+=`</div>`;
+    det.innerHTML=html;
+    det.classList.add('open');
+    for(let l=fromL;l<=toL;l++){
+        drawMiniVel('trv-a-'+l,d.velocity.attention[l],velMax,'rgba(34,211,238,','rgba(248,113,113,');
+        drawMiniVel('trv-m-'+l,d.velocity.mlp[l],velMax,'rgba(192,132,252,','rgba(248,113,113,');
+    }
+}
+
+function drawMiniVel(id,val,velMax,posCol,negCol){
+    const c=document.getElementById(id);if(!c)return;
+    const w=c.clientWidth||180,h=16,mid=w/2,scale=(mid-12)/velMax;
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('width',w);svg.setAttribute('height',h);svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+    const cl=document.createElementNS('http://www.w3.org/2000/svg','line');
+    cl.setAttribute('x1',mid);cl.setAttribute('x2',mid);cl.setAttribute('y1',3);cl.setAttribute('y2',h-3);
+    cl.setAttribute('stroke','rgba(56,189,248,0.12)');cl.setAttribute('stroke-width',1);svg.appendChild(cl);
+    const len=Math.abs(val)*scale;
+    if(len>1){const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+        r.setAttribute('x',val>0?mid+1:mid-1-len);r.setAttribute('y',4);
+        r.setAttribute('width',len);r.setAttribute('height',h-8);r.setAttribute('rx',2);
+        r.setAttribute('fill',val>0?posCol+'0.5)':negCol+'0.4)');svg.appendChild(r);}
+    c.appendChild(svg);
+}
+
+// ── SYNERGY ──
+function renderSynergy(d){
+    const cos=d.velocity.attn_mlp_cosine;if(!cos)return'';
+    let nOpp=0,nCoop=0;
+    for(let i=0;i<33;i++){
+        const active=Math.abs(d.velocity.attention[i])>.15||Math.abs(d.velocity.mlp[i])>.15;
+        if(!active)continue;
+        if(cos[i]<-.3)nOpp++;if(cos[i]>.3)nCoop++;
+    }
+    let narr=`Across 33 layers, attention and MLP don't just add up — they <em>interact</em>. `;
+    if(nOpp>3)narr+=`They actively <em>oppose</em> each other at ${nOpp} layers, using tension to refine the prediction. `;
+    if(nCoop>2)narr+=`They <em>cooperate</em> at ${nCoop} layers. `;
+    narr+=`Green = cooperation. Red = opposition.`;
+    return`<div class="sec-label">Attention ↔ MLP Dynamics</div>
+        <div class="syn-card"><div class="syn-narr">${narr}</div><div id="syn-chart"></div></div>`;
+}
+
+function drawSynergyChart(d){
+    const c=document.getElementById('syn-chart');
+    if(!c||!d.velocity.attn_mlp_cosine)return;
+    const cos=d.velocity.attn_mlp_cosine;
+    const margin={top:16,right:20,bottom:28,left:44};
+    const W=c.clientWidth||860,H=130;
+    const w=W-margin.left-margin.right,h=H-margin.top-margin.bottom;
+    const svg=d3.select(c).append('svg').attr('width',W).attr('height',H);
+    const g=svg.append('g').attr('transform',`translate(${margin.left},${margin.top})`);
+    const x=d3.scaleLinear().domain([0,32]).range([0,w]);
+    const y=d3.scaleLinear().domain([-1,1]).range([h,0]);
+    g.append('line').attr('x1',0).attr('x2',w).attr('y1',y(0)).attr('y2',y(0)).attr('stroke','rgba(56,189,248,0.2)');
+    [-.3,.3].forEach(v=>{g.append('line').attr('x1',0).attr('x2',w).attr('y1',y(v)).attr('y2',y(v))
+        .attr('stroke','rgba(148,163,184,0.08)').attr('stroke-dasharray','3,4');});
+    g.append('text').attr('x',-8).attr('y',y(.8)+3).attr('text-anchor','end').attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(45,212,160,0.4)').text('cooperate');
+    g.append('text').attr('x',-8).attr('y',y(-.8)+3).attr('text-anchor','end').attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(248,113,113,0.4)').text('oppose');
+    const area=d3.area().x((_,i)=>x(i)).y0(y(0)).y1(v=>y(v)).curve(d3.curveMonotoneX);
+    g.append('path').datum(cos.map(v=>Math.max(v,0))).attr('d',area).attr('fill','rgba(45,212,160,0.08)');
+    g.append('path').datum(cos.map(v=>Math.min(v,0))).attr('d',area).attr('fill','rgba(248,113,113,0.08)');
+    const line=d3.line().x((_,i)=>x(i)).y(v=>y(v)).curve(d3.curveMonotoneX);
+    g.append('path').datum(cos).attr('d',line).attr('fill','none').attr('stroke','rgba(200,208,224,0.35)').attr('stroke-width',1.5);
+    cos.forEach((v,i)=>{
+        const act=Math.abs(d.velocity.attention[i])>.15||Math.abs(d.velocity.mlp[i])>.15;
+        const col=!act?'rgba(148,163,184,0.12)':v>.3?'rgba(45,212,160,0.65)':v<-.3?'rgba(248,113,113,0.65)':'rgba(148,163,184,0.25)';
+        g.append('circle').attr('cx',x(i)).attr('cy',y(v)).attr('r',act?3.5:2).attr('fill',col);});
+    // SAE layer markers
+    [0,8,17,23,29,32].forEach(l=>{
+        g.append('line').attr('x1',x(l)).attr('x2',x(l)).attr('y1',0).attr('y2',h)
+            .attr('stroke','rgba(56,189,248,0.08)').attr('stroke-dasharray','2,3');
+    });
+    for(let i=0;i<33;i+=4){g.append('text').attr('x',x(i)).attr('y',h+14).attr('text-anchor','middle')
+        .attr('font-family','var(--font-mono)').attr('font-size','7').attr('fill','rgba(92,106,132,0.35)').text('L'+(i+1));}
+}
+
+// ═══════════════════════════════════════════
+// SEQUENCE BAR
+// ═══════════════════════════════════════════
+function buildSeqBar(){
+    const bar=document.getElementById('seq-bar');bar.innerHTML='';
+    for(let i=0;i<META.sequence.length;i++){
+        const el=document.createElement('div');el.className='res';el.dataset.pos=i;
+        const showN=i%10===0||i===META.sequence.length-1;
+        el.innerHTML=`<span class="n">${showN?i+1:''}</span>${META.sequence[i]}<div class="imp"></div>`;
+        el.onclick=()=>selectPos(i);
+        const ann=META.curated_annotations?.[String(i)];
+        if(ann)el.title=ann.description;
+        bar.appendChild(el);
+    }
+}
+function updateSeqHL(d){
+    document.querySelectorAll('.res').forEach(el=>{el.classList.remove('src-struct','src-coevol','src-local','src-generic');
+        el.querySelector('.imp').style.background='transparent';});
+    const legend=document.getElementById('seq-bar-legend');
+    if(legend){if(d)legend.classList.add('visible');else legend.classList.remove('visible');}
+    if(!d)return;
+    const contacts=new Set(d.annotations?.structural_contacts||[]);
+    const coevol=new Set(d.annotations?.coevolving_positions||[]);
+    const pos=d.position;
+    const imp=d.source_importance,mx=Math.max(...imp.total,.001);
+    imp.total.forEach((v,i)=>{const el=document.querySelector(`.res[data-pos="${i}"]`);if(!el)return;
+        if(i===pos)return;
+        const bar=el.querySelector('.imp');const rel=v/mx;
+        const isS=contacts.has(i),isC=coevol.has(i),isL=Math.abs(i-pos)<=5;
+        // Apply border classes based on annotation category
+        if(isS)el.classList.add('src-struct');
+        else if(isC)el.classList.add('src-coevol');
+        else if(isL)el.classList.add('src-local');
+        if(rel<.03)return;
+        // Bar color matches annotation category
+        if(isS)bar.style.background=`rgba(34,211,238,${.3+rel*.6})`;
+        else if(isC)bar.style.background=`rgba(52,211,153,${.3+rel*.6})`;
+        else if(isL)bar.style.background=`rgba(251,191,36,${.15+rel*.45})`;
+        else bar.style.background=`rgba(148,163,184,${.15+rel*.4})`;});
+}
+function hlSrc(sources){
+    document.querySelectorAll('.res').forEach(el=>{el.classList.remove('src-struct','src-coevol','src-local','src-generic');});
+    if(!sources)return;
+    sources.forEach(s=>{const el=document.querySelector(`.res[data-pos="${s.pos}"]`);if(!el)return;
+        const lb=s.labels||[];
+        if(lb.includes('structural'))el.classList.add('src-struct');
+        else if(lb.includes('coevolving'))el.classList.add('src-coevol');
+        else if(lb.includes('local'))el.classList.add('src-local');
+        else el.classList.add('src-generic');});
+}
+function focusHead(l,h){
+    const srcs=(POS_DATA.head_attention_sources||{})[`${l}_${h}`]||[];hlSrc(srcs);
+    document.querySelectorAll('.hcell.hl').forEach(el=>el.classList.remove('hl'));
+    const cell=document.querySelector(`.hcell[data-head="${h}"]`);if(cell)cell.classList.add('hl');
+}
+
+// ═══════════════════════════════════════════
+// SELECT POSITION
+// ═══════════════════════════════════════════
+async function selectPos(pos){
+    document.querySelectorAll('.res.sel').forEach(el=>el.classList.remove('sel'));
+    const el=document.querySelector(`.res[data-pos="${pos}"]`);
+    if(el){el.classList.add('sel');el.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});}
+    const main=document.getElementById('main');
+    main.innerHTML=`<div class="empty"><div class="spinner"></div>Loading position ${pos+1} (${META.sequence[pos]})…</div>`;
+    try{const resp=await fetch(`${DATA_ROOT}/pos_${pos}.json`);POS_DATA=await resp.json();
+        window.location.hash=pos;updateSeqHL(POS_DATA);renderAll(POS_DATA);
+    }catch(e){main.innerHTML=`<div class="empty">No data for position ${pos}.</div>`;console.error(e);}}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+
+// ── Layer reference tooltip ──
+(function(){
+    const tip=document.createElement('div');tip.id='layer-tip';document.body.appendChild(tip);
+    document.addEventListener('mouseover',function(e){
+        const ref=e.target.closest('.layer-ref');
+        if(!ref||!POS_DATA)return;
+        const from=parseInt(ref.dataset.from),to=parseInt(ref.dataset.to);
+        const race=computeRace(POS_DATA);if(!race)return;
+        const startIdx=Math.min(from,race.length-1),endIdx=Math.min(to,race.length-1);
+        const startState=race[startIdx],endState=race[endIdx];
+        // Collect top candidates visible at either end
+        const seen=new Set();
+        startState.slice(0,4).forEach(s=>seen.add(s.aa));
+        endState.slice(0,4).forEach(s=>seen.add(s.aa));
+        const cands=[...seen].map(aa=>{
+            const sp=(startState.find(s=>s.aa===aa)||{prob:0}).prob;
+            const ep=(endState.find(s=>s.aa===aa)||{prob:0}).prob;
+            return{aa,sp,ep,d:ep-sp};
+        }).sort((a,b)=>b.ep-a.ep).slice(0,5);
+        const predAA=POS_DATA.prediction.top5[0].aa;
+        const trueAA=POS_DATA.sequence_aa;
+        const singleLayer=from===to;
+        let h=`<div class="lt-title">${singleLayer?'Layer '+from:'Layers '+from+'\u2013'+to}</div><table>`;
+        h+=singleLayer
+          ?`<tr><td class="lt-head"></td><td class="lt-head">L${from}</td></tr>`
+          :`<tr><td class="lt-head"></td><td class="lt-head">L${from}</td><td class="lt-head">L${to}</td><td class="lt-head">\u0394</td></tr>`;
+        cands.forEach(c=>{
+            const cls=c.d>0.005?'lt-up':c.d<-0.005?'lt-down':'lt-flat';
+            const sign=c.d>0?'+':'';
+            const mark=c.aa===trueAA?' \u2713':c.aa===predAA?' \u2190':'';
+            h+=`<tr><td class="lt-aa" style="color:${aaColor(c.aa)}">${c.aa}${mark}</td>`
+              +`<td>${(c.sp*100).toFixed(1)}%</td>`;
+            if(!singleLayer) h+=`<td>${(c.ep*100).toFixed(1)}%</td>`
+              +`<td class="${cls}">${sign}${(c.d*100).toFixed(1)}</td>`;
+            h+=`</tr>`;
+        });
+        h+=`</table>`;
+        tip.innerHTML=h;tip.style.display='block';
+        const rect=ref.getBoundingClientRect();
+        tip.style.left=Math.max(4,Math.min(rect.left,window.innerWidth-tip.offsetWidth-4))+'px';
+        tip.style.top=(rect.top-tip.offsetHeight-8)+'px';
+        if(parseFloat(tip.style.top)<4)tip.style.top=(rect.bottom+8)+'px';
+    });
+    document.addEventListener('mouseout',function(e){
+        if(e.target.closest('.layer-ref'))tip.style.display='none';
+    });
+})();
+
+// ── Residue reference interactions (hover highlights seq bar, click navigates) ──
+(function(){
+    document.addEventListener('mouseover',function(e){
+        const ref=e.target.closest('.residue-ref');
+        if(!ref)return;
+        const pos=parseInt(ref.dataset.pos);
+        const el=document.querySelector(`.res[data-pos="${pos}"]`);
+        if(el)el.classList.add('narrative-hover');
+    });
+    document.addEventListener('mouseout',function(e){
+        if(e.target.closest('.residue-ref'))
+            document.querySelectorAll('.res.narrative-hover').forEach(el=>el.classList.remove('narrative-hover'));
+    });
+    document.addEventListener('click',function(e){
+        const ref=e.target.closest('.residue-ref');
+        if(!ref)return;
+        selectPos(parseInt(ref.dataset.pos));
+    });
+})();
+
+// ── Feature/neuron reference tooltip ──
+(function(){
+    const tip=document.createElement('div');tip.id='feature-tip';document.body.appendChild(tip);
+    function findLabel(fid,layer){
+        if(!FEAT_DB?.features)return null;
+        if(layer) return FEAT_DB.features[layer]?.[String(fid)]||null;
+        for(const lk of Object.keys(FEAT_DB.features)){
+            const entry=FEAT_DB.features[lk][String(fid)];
+            if(entry)return entry;
+        }
+        return null;
+    }
+    function findNeuron(nid,layer){
+        if(!POS_DATA?.mlp_neurons||!layer)return null;
+        const ld=POS_DATA.mlp_neurons[String(layer)];
+        if(!ld)return null;
+        for(const list of [ld.top_writers||[],ld.top_erasers||[]]){
+            const n=list.find(e=>String(e.neuron)===String(nid));
+            if(n)return n;
+        }
+        return null;
+    }
+    document.addEventListener('mouseover',function(e){
+        const ref=e.target.closest('.feature-ref');
+        if(!ref)return;
+        const fid=ref.dataset.fid,prefix=ref.dataset.prefix,layer=ref.dataset.layer||null;
+        const layerNote=layer?`Layer ${layer} \u00b7 `:'';
+        if(prefix==='N'){
+            const n=findNeuron(fid,layer);
+            const title=`${layerNote}Neuron ${fid}`;
+            if(!n){
+                tip.innerHTML=`<div class="ft-title">${title}</div><div class="ft-summary">No data for this position</div>`;
+            }else{
+                const sign=n.answer_proj>=0?'+':'';
+                const aa=n.top_aa.map(([a,v])=>`${a} ${v>=0?'+':''}${v.toFixed(2)}`).join(', ');
+                tip.innerHTML=`<div class="ft-title">${title}</div>`
+                    +`<div class="ft-stats">Act ${n.activation.toFixed(2)} \u00b7 Answer proj ${sign}${n.answer_proj.toFixed(2)}</div>`
+                    +`<div class="ft-aa">Writes \u2192 ${esc(aa)}</div>`;
+            }
+        }else{
+            const label=findLabel(fid,layer);
+            const summary=label?.summary||'Unlabeled feature';
+            tip.innerHTML=`<div class="ft-title">${layerNote}Feature ${fid}</div><div class="ft-summary">${esc(summary)}</div>`;
+        }
+        tip.style.display='block';
+        const rect=ref.getBoundingClientRect();
+        tip.style.left=Math.max(4,Math.min(rect.left,window.innerWidth-tip.offsetWidth-4))+'px';
+        tip.style.top=(rect.top-tip.offsetHeight-8)+'px';
+        if(parseFloat(tip.style.top)<4)tip.style.top=(rect.bottom+8)+'px';
+    });
+    document.addEventListener('mouseout',function(e){
+        if(e.target.closest('.feature-ref'))tip.style.display='none';
+    });
+})();
+
+// python3 -m http.server 8080
+(async function(){
+    try{
+        const[metaR,labelsR,coevolR]=await Promise.all([
+            fetch(`${DATA_ROOT}/metadata.json`),
+            fetch(`${LABELS_ROOT}/feature_labels.json`).catch(()=>null),
+            fetch(`${DATA_ROOT}/${DATA_ROOT.split('/').pop()}_coevolution.json`).catch(()=>null)
+        ]);
+        META=await metaR.json();
+        if(labelsR?.ok)FEAT_DB=await labelsR.json();
+        else console.warn('feature_labels.json not found — features will show without labels');
+        if(coevolR?.ok){COEVOL_MI=await coevolR.json();console.log(`Loaded coevolution MI: ${Object.keys(COEVOL_MI.mi_matrix_nonzero||{}).length} pairs`);}
+        else console.warn('coevolution JSON not found — MI scores unavailable');
+        document.getElementById('h-protein').textContent=META.protein_name;
+        buildSeqBar();
+        const h=window.location.hash.slice(1);
+        if(h&&!isNaN(parseInt(h)))selectPos(parseInt(h));
+    }catch(e){
+        document.getElementById('main').innerHTML=`<div class="empty"><p>Could not load data.</p>
+            <p style="margin-top:16px;font-size:.82rem;color:var(--text-muted)">Run <code style="color:var(--accent);font-family:var(--font-mono)">python -m http.server 8080</code> from the parent folder, then open <code style="color:var(--accent)">http://localhost:8080</code></p></div>`;
+        console.error(e);
+    }
+})();
+</script>
+</body>
+</html>
